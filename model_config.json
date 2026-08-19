@@ -1,0 +1,1 @@
+{"num_classes": 5, "class_names": ["Deformation", "Excellent", "Fracture", "Rusting", "Scratches"], "mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225], "input_size": 224}

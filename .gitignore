@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+
+*.pth
+*.pt
+*.ckpt
+
+*.zip
+
+.DS_Store
+
+.streamlit/secrets.toml
