@@ -1,0 +1,20 @@
+<span class="badge @CssClass" title="@Tooltip">@Text</span>
+
+@code {
+    /// <summary>"Pass" / "Defective" as returned by the API.</summary>
+    [Parameter]
+    public string? Result { get; set; }
+
+    [Parameter]
+    public string? Tooltip { get; set; }
+
+    private bool IsDefective => InspectionResults.IsDefective(Result);
+
+    private string Text => string.IsNullOrWhiteSpace(Result)
+        ? "—"
+        : (IsDefective ? InspectionResults.Defective : InspectionResults.Pass);
+
+    private string CssClass => string.IsNullOrWhiteSpace(Result)
+        ? "badge-neutral badge-plain"
+        : (IsDefective ? "badge-defect" : "badge-pass");
+}

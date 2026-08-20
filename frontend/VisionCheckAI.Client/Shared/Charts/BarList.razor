@@ -1,0 +1,45 @@
+@* Horizontal bars. Labels read left-to-right, values right-aligned and tabular. *@
+
+@if (Items is null || Items.Count == 0)
+{
+    <p class="text-muted" style="font-size:var(--t-sm);">@EmptyText</p>
+}
+else
+{
+    <div role="list">
+        @foreach (var item in Items)
+        {
+            <div class="bar-row" role="listitem">
+                <span class="bar-label" title="@item.Label">@item.Label</span>
+
+                <div class="bar-track"
+                     role="img"
+                     aria-label="@($"{item.Label}: {FormatValue(item.Value)}")">
+                    <div class="bar-fill @item.ModifierClass" style="width:@Percent(item.Value)"></div>
+                </div>
+
+                <span class="bar-value">@FormatValue(item.Value)</span>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<BarItem>? Items { get; set; }
+    [Parameter] public string EmptyText { get; set; } = "No data for this period.";
+    [Parameter] public string ValueFormat { get; set; } = "0.##";
+
+    private double Max => Items is null || Items.Count == 0
+        ? 0
+        : Math.Max(Items.Max(i => i.Value), 0);
+
+    private string Percent(double value)
+    {
+        if (Max <= 0) return "0%";
+        var pct = Math.Clamp(value / Max * 100.0, 0, 100);
+        return pct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    }
+
+    private string FormatValue(double value) =>
+        value.ToString(ValueFormat, System.Globalization.CultureInfo.InvariantCulture);
+}

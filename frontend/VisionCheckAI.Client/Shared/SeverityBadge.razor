@@ -1,0 +1,28 @@
+@if (!string.IsNullOrWhiteSpace(Severity))
+{
+    <span class="badge @CssClass">@Label</span>
+}
+else
+{
+    <span class="text-faint">—</span>
+}
+
+@code {
+    /// <summary>"Low" / "Medium" / "High".</summary>
+    [Parameter]
+    public string? Severity { get; set; }
+
+    private string Label => Severity switch
+    {
+        null or "" => "—",
+        _ => char.ToUpperInvariant(Severity[0]) + Severity[1..].ToLowerInvariant()
+    };
+
+    private string CssClass => (Severity ?? string.Empty).ToLowerInvariant() switch
+    {
+        "low" => "badge-low",
+        "medium" or "med" => "badge-medium",
+        "high" or "critical" => "badge-high",
+        _ => "badge-neutral badge-plain"
+    };
+}

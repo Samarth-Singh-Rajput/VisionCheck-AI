@@ -1,0 +1,136 @@
+@page "/login"
+@layout EmptyLayout
+@using System.ComponentModel.DataAnnotations
+@inject IAuthApi AuthApi
+@inject SessionStore Session
+@inject NavigationManager Navigation
+@inject ToastService Toasts
+
+<PageTitle>Sign in · VisionCheck AI</PageTitle>
+
+<div class="auth-screen">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <span class="mark"><Icon Name="mark" Size="20" /></span>
+            <span class="brand-name" style="font-size:var(--t-lg);">VisionCheck <span>AI</span></span>
+        </div>
+
+        <div class="auth-panel">
+            <h1 class="auth-heading">Sign in</h1>
+            <p class="auth-sub">Surface inspection for the fastener line.</p>
+
+            <EditForm Model="@_model" OnValidSubmit="@SubmitAsync">
+                <DataAnnotationsValidator />
+
+                <div class="stack-4">
+                    @if (!string.IsNullOrWhiteSpace(_error))
+                    {
+                        <div class="form-error" role="alert">
+                            <Icon Name="alert-triangle" Size="14" />
+                            <span>@_error</span>
+                        </div>
+                    }
+
+                    <div class="field">
+                        <label class="field-label" for="username">Username</label>
+                        <InputText id="username"
+                                   class="input"
+                                   autocomplete="username"
+                                   spellcheck="false"
+                                   aria-invalid="@(_error is not null)"
+                                   @bind-Value="_model.Username" />
+                        <ValidationMessage For="() => _model.Username" />
+                    </div>
+
+                    <div class="field">
+                        <label class="field-label" for="password">Password</label>
+                        <InputText id="password"
+                                   type="password"
+                                   class="input"
+                                   autocomplete="current-password"
+                                   aria-invalid="@(_error is not null)"
+                                   @bind-Value="_model.Password" />
+                        <ValidationMessage For="() => _model.Password" />
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg btn-block" disabled="@_isBusy">
+                        @if (_isBusy)
+                        {
+                            <Icon Name="loader" Size="14" Class="spin" />
+                            <span>Signing in…</span>
+                        }
+                        else
+                        {
+                            <span>Sign in</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+
+        <p class="auth-foot">Authorised personnel only. Sessions expire with the issued token.</p>
+    </div>
+</div>
+
+@code {
+    private readonly LoginModel _model = new();
+    private bool _isBusy;
+    private string? _error;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // Already signed in? Skip the form.
+        if (Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo(SafeReturnUrl(), replace: true);
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+        _isBusy = true;
+
+        try
+        {
+            await AuthApi.SignInAsync(_model.Username.Trim(), _model.Password);
+            Toasts.ShowSuccess("Signed in", $"Welcome back, {Session.User?.DisplayName}.");
+            Navigation.NavigateTo(SafeReturnUrl(), replace: true);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>Only ever return to a path inside this app.</summary>
+    private string SafeReturnUrl()
+    {
+        if (string.IsNullOrWhiteSpace(ReturnUrl) ||
+            ReturnUrl.StartsWith("//", StringComparison.Ordinal) ||
+            ReturnUrl.Contains("://", StringComparison.Ordinal) ||
+            ReturnUrl.StartsWith("login", StringComparison.OrdinalIgnoreCase))
+        {
+            return "dashboard";
+        }
+
+        return ReturnUrl;
+    }
+
+    private sealed class LoginModel
+    {
+        [Required(ErrorMessage = "Enter your username.")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Enter your password.")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

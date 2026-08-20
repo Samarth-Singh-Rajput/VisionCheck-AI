@@ -1,0 +1,319 @@
+/* ------------------------------------------------------------------
+   Application shell — fixed sidebar, fixed top bar, scrolling content
+   ------------------------------------------------------------------ */
+
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* -------------------------------- Sidebar ------------------------- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  border-right: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--topbar-h);
+  padding: 0 var(--s-4);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+
+.sidebar-brand .mark {
+  color: var(--accent);
+}
+
+.brand-name {
+  font-size: var(--t-md);
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+  white-space: nowrap;
+}
+
+.brand-name span {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.sidebar-nav {
+  padding: var(--s-3) var(--s-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-section {
+  padding: var(--s-4) var(--s-2) var(--s-2);
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 7px var(--s-3);
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  font-size: var(--t-md);
+  white-space: nowrap;
+  transition: background var(--transition), color var(--transition);
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.nav-item.active {
+  background: var(--bg-active);
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Active marker: a 2px accent tick, not a filled pill. */
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--s-2) * -1);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+}
+
+.nav-item svg {
+  color: currentColor;
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--border);
+  font-size: var(--t-xs);
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+
+.build-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--pass);
+  flex: none;
+}
+
+/* -------------------------------- Main ---------------------------- */
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  height: var(--topbar-h);
+  padding: 0 var(--s-6);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+/* The page already carries an <h1>; the top bar only names the section once the
+   sidebar has collapsed to an icon rail and labels are no longer visible. */
+.topbar-title {
+  display: none;
+  font-size: var(--t-md);
+  font-weight: 500;
+  letter-spacing: var(--track-tight);
+}
+
+@media (max-width: 1024px) {
+  .topbar-title { display: block; }
+}
+
+.topbar-spacer {
+  margin-left: auto;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding-left: var(--s-4);
+  border-left: 1px solid var(--border);
+  min-height: 24px;
+}
+
+.user-name {
+  font-size: var(--t-sm);
+  line-height: 1.2;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.app-content {
+  flex: 1;
+  padding: var(--s-6);
+  max-width: 1560px;
+  width: 100%;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  margin-bottom: var(--s-6);
+  flex-wrap: wrap;
+}
+
+.page-title {
+  font-size: var(--t-xl);
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+  line-height: var(--lh-tight);
+}
+
+.page-subtitle {
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.route-status {
+  padding: var(--s-8);
+  color: var(--text-muted);
+  font-size: var(--t-md);
+}
+
+/* -------------------------------- Grids --------------------------- */
+
+.grid {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.kpi-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.chart-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.chart-row-wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.split-2 {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.stack-3 { display: flex; flex-direction: column; gap: var(--s-3); }
+.stack-4 { display: flex; flex-direction: column; gap: var(--s-4); }
+.stack-6 { display: flex; flex-direction: column; gap: var(--s-6); }
+
+/* ------------------------------ Login ----------------------------- */
+
+.auth-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--s-6);
+  background: var(--bg);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 348px;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-6);
+}
+
+.auth-brand .mark { color: var(--accent); }
+
+.auth-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-panel);
+  padding: var(--s-6);
+}
+
+.auth-heading {
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+}
+
+.auth-sub {
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+  margin-top: var(--s-1);
+  margin-bottom: var(--s-6);
+}
+
+.auth-foot {
+  margin-top: var(--s-4);
+  font-size: var(--t-xs);
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* ----------------------------- Responsive ------------------------- */
+
+@media (max-width: 1180px) {
+  .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .split-2 { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 1024px) {
+  .app-shell { grid-template-columns: var(--sidebar-w-rail) minmax(0, 1fr); }
+  .nav-item { justify-content: center; padding: 9px 0; }
+  .nav-label,
+  .brand-name,
+  .sidebar-foot .build-label { display: none; }
+  .sidebar-brand { justify-content: center; padding: 0; }
+  .sidebar-foot { justify-content: center; }
+  .app-content { padding: var(--s-4); }
+  .topbar { padding: 0 var(--s-4); }
+}
+
+@media (max-width: 860px) {
+  .chart-row { grid-template-columns: minmax(0, 1fr); }
+  .user-meta { display: none; }
+}
+
+@media (max-width: 640px) {
+  .kpi-row { grid-template-columns: minmax(0, 1fr); }
+}

@@ -1,0 +1,223 @@
+@page "/"
+@page "/dashboard"
+@attribute [Authorize]
+@using System.Globalization
+@inject IDashboardApi DashboardApi
+@inject ToastService Toasts
+
+<PageTitle>Dashboard · VisionCheck AI</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Surface inspection performance across the fastener line.</p>
+    </div>
+
+    <button type="button" class="btn" @onclick="() => LoadAsync(showToast: true)" disabled="@_isLoading">
+        <Icon Name="refresh" Size="14" Class="@(_isLoading ? "spin" : null)" />
+        <span>Refresh</span>
+    </button>
+</div>
+
+@if (_error is not null)
+{
+    <div class="panel">
+        <div class="panel-body">
+            <div class="form-error" role="alert">
+                <Icon Name="alert-triangle" Size="14" />
+                <span>@_error</span>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="stack-3">
+        <div class="grid kpi-row">
+            @if (_isLoading)
+            {
+                for (var i = 0; i < 4; i++)
+                {
+                    <div class="metric">
+                        <Skeleton Width="88px" Height="10px" />
+                        <Skeleton Width="64px" Height="24px" />
+                        <Skeleton Width="112px" Height="10px" />
+                    </div>
+                }
+            }
+            else if (_summary is not null)
+            {
+                <div class="metric">
+                    <span class="metric-label"><Icon Name="activity" Size="12" />Total inspections</span>
+                    <span class="metric-value">@Number(_summary.TotalInspections)</span>
+                    <span class="metric-note">All parts scanned to date</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-label"><Icon Name="check-circle" Size="12" />Pass</span>
+                    <span class="metric-value is-pass">@Number(_summary.PassCount)</span>
+                    <span class="metric-note">@Share(_summary.PassCount) of total</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-label"><Icon Name="alert-triangle" Size="12" />Defective</span>
+                    <span class="metric-value is-defect">@Number(_summary.DefectiveCount)</span>
+                    <span class="metric-note">@Share(_summary.DefectiveCount) of total</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-label"><Icon Name="filter" Size="12" />Defect rate</span>
+                    <span class="metric-value">@Percent(_summary.DefectRatePercent)</span>
+                    <span class="metric-note">@DefectRateNote</span>
+                </div>
+            }
+        </div>
+
+        <div class="grid chart-row">
+            <section class="panel">
+                <div class="panel-head">
+                    <h2 class="panel-title">Defects by category</h2>
+                    <span class="eyebrow">Count</span>
+                </div>
+                <div class="panel-body">
+                    @if (_isLoading)
+                    {
+                        <div class="stack-3">
+                            @for (var i = 0; i < 4; i++)
+                            {
+                                <Skeleton Height="14px" />
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <BarList Items="@_categoryBars" EmptyText="No defects recorded yet." />
+                    }
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-head">
+                    <h2 class="panel-title">Defects by severity</h2>
+                    <span class="eyebrow">Share</span>
+                </div>
+                <div class="panel-body">
+                    @if (_isLoading)
+                    {
+                        <div class="stack-3">
+                            <Skeleton Height="8px" />
+                            @for (var i = 0; i < 3; i++)
+                            {
+                                <Skeleton Height="14px" />
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <SeverityBreakdown Counts="@(_summary?.DefectsBySeverity)" />
+                    }
+                </div>
+            </section>
+        </div>
+
+        <section class="panel">
+            <div class="panel-head">
+                <h2 class="panel-title">Daily trend</h2>
+                <span class="eyebrow">@TrendRangeLabel</span>
+            </div>
+            <div class="panel-body">
+                @if (_isLoading)
+                {
+                    <Skeleton Height="200px" Radius="5px" />
+                }
+                else
+                {
+                    <TrendChart Points="@(_summary?.DailyTrend)" />
+                }
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    private DashboardSummaryDto? _summary;
+    private List<BarItem> _categoryBars = new();
+    private bool _isLoading = true;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync(bool showToast = false)
+    {
+        _isLoading = true;
+        _error = null;
+
+        try
+        {
+            _summary = await DashboardApi.GetSummaryAsync();
+
+            _categoryBars = (_summary.DefectsByCategory ?? new List<CategoryCountDto>())
+                .OrderByDescending(c => c.Count)
+                .Select(c => new BarItem(
+                    string.IsNullOrWhiteSpace(c.Category) ? "Unclassified" : c.Category,
+                    c.Count))
+                .ToList();
+
+            if (showToast)
+            {
+                Toasts.ShowSuccess("Dashboard refreshed");
+            }
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string DefectRateNote
+    {
+        get
+        {
+            if (_summary is null || _summary.TotalInspections == 0)
+            {
+                return "No inspections yet";
+            }
+
+            return $"{Number(_summary.DefectiveCount)} of {Number(_summary.TotalInspections)} parts rejected";
+        }
+    }
+
+    private string TrendRangeLabel
+    {
+        get
+        {
+            var trend = _summary?.DailyTrend;
+            if (trend is null || trend.Count == 0)
+            {
+                return "—";
+            }
+
+            var days = trend.Count;
+            return days == 1 ? "1 day" : $"Last {days} days";
+        }
+    }
+
+    private string Share(int value)
+    {
+        if (_summary is null || _summary.TotalInspections == 0)
+        {
+            return "—";
+        }
+
+        return Percent(value / (double)_summary.TotalInspections * 100.0);
+    }
+
+    private static string Number(int value) => value.ToString("N0", CultureInfo.InvariantCulture);
+
+    private static string Percent(double value) =>
+        value.ToString("0.#", CultureInfo.InvariantCulture) + "%";
+}

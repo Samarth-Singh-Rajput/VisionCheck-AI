@@ -1,0 +1,88 @@
+@implements IDisposable
+@inject NavigationManager Navigation
+@inject ThemeService Theme
+@inject IAuthApi AuthApi
+
+<header class="topbar">
+    <h2 class="topbar-title">@CurrentSectionName</h2>
+
+    <div class="topbar-spacer"></div>
+
+    <button type="button"
+            class="btn btn-ghost btn-icon"
+            title="@(Theme.IsDark ? "Switch to light theme" : "Switch to dark theme")"
+            aria-label="@(Theme.IsDark ? "Switch to light theme" : "Switch to dark theme")"
+            @onclick="ToggleThemeAsync">
+        <Icon Name="@(Theme.IsDark ? "sun" : "moon")" />
+    </button>
+
+    <AuthorizeView>
+        <Authorized>
+            <div class="topbar-user">
+                <div class="user-meta">
+                    <span class="user-name">@DisplayNameFor(context)</span>
+                    <span class="badge badge-role">@RoleFor(context)</span>
+                </div>
+
+                <button type="button"
+                        class="btn btn-ghost btn-icon"
+                        title="Sign out"
+                        aria-label="Sign out"
+                        @onclick="SignOutAsync">
+                    <Icon Name="logout" />
+                </button>
+            </div>
+        </Authorized>
+    </AuthorizeView>
+</header>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        Theme.Changed += OnThemeChanged;
+    }
+
+    private string CurrentSectionName
+    {
+        get
+        {
+            var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?')[0].TrimEnd('/');
+
+            return path switch
+            {
+                "" or "dashboard" => "Dashboard",
+                "inspection/new" => "New inspection",
+                "inspection/history" => "Inspection history",
+                _ => "VisionCheck AI"
+            };
+        }
+    }
+
+    private static string DisplayNameFor(AuthenticationState state) =>
+        state.User.FindFirst("display_name")?.Value
+        ?? state.User.Identity?.Name
+        ?? "Signed in";
+
+    private static string RoleFor(AuthenticationState state) =>
+        state.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "—";
+
+    private async Task ToggleThemeAsync() => await Theme.ToggleAsync();
+
+    private async Task SignOutAsync()
+    {
+        await AuthApi.SignOutAsync();
+        Navigation.NavigateTo("login", replace: true);
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        Theme.Changed -= OnThemeChanged;
+    }
+}

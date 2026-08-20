@@ -1,0 +1,208 @@
+@* Result view shared by the New Inspection page and the History detail drawer. *@
+@using System.Globalization
+@inject ApiSettings Api
+
+<div class="stack-4">
+    <div class="frame">
+        @if (!string.IsNullOrWhiteSpace(ImageSrc))
+        {
+            <img src="@ImageSrc" alt="@ImageAlt" />
+
+            foreach (var defect in BoxedDefects)
+            {
+                <div class="detection" style="@BoxStyle(defect.BoundingBox!)">
+                    <span class="detection-corner tl"></span>
+                    <span class="detection-corner tr"></span>
+                    <span class="detection-corner bl"></span>
+                    <span class="detection-corner br"></span>
+                    <span class="detection-label">
+                        @defect.Category
+                        <span>@FormatPercent(defect.ConfidencePercent)</span>
+                    </span>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="frame-empty">No image available for this inspection.</div>
+        }
+    </div>
+
+    <div class="verdict">
+        <span class="verdict-result @(Inspection.IsDefective ? "is-defect" : "is-pass")">
+            @(Inspection.IsDefective ? "Defective" : "Pass")
+        </span>
+
+        @if (!string.IsNullOrWhiteSpace(Inspection.Severity))
+        {
+            <SeverityBadge Severity="@Inspection.Severity" />
+        }
+
+        <span class="text-muted num" style="margin-left:auto;">
+            @FormatPercent(Inspection.ConfidencePercent) confidence
+        </span>
+    </div>
+
+    <div class="meter" role="img" aria-label="@($"Model confidence {FormatPercent(Inspection.ConfidencePercent)}")">
+        <div class="meter-fill @(Inspection.IsDefective ? "is-defect" : "is-pass")"
+             style="width:@CssPercent(Inspection.ConfidencePercent)"></div>
+    </div>
+
+    @if (ShowMeta)
+    {
+        <hr class="divider" />
+
+        <dl class="defs">
+            <dt>Product</dt>
+            <dd>@Inspection.ProductLabel</dd>
+
+            <dt>Inspected</dt>
+            <dd>@FormatTimestamp(Inspection.Timestamp)</dd>
+
+            <dt>Operator</dt>
+            <dd>@(string.IsNullOrWhiteSpace(Inspection.OperatorName) ? "—" : Inspection.OperatorName)</dd>
+
+            <dt>Inspection ID</dt>
+            <dd class="text-muted">@Inspection.Id</dd>
+        </dl>
+    }
+
+    <hr class="divider" />
+
+    <div class="stack-3">
+        <span class="eyebrow">Detected defects</span>
+
+        @if (Inspection.Defects.Count == 0)
+        {
+            <p class="text-muted" style="font-size:var(--t-sm);">
+                No surface defects detected. The part matches the accepted finish class.
+            </p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Category</th>
+                        <th scope="col">Severity</th>
+                        <th scope="col" style="text-align:right;">Confidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var defect in Inspection.Defects)
+                    {
+                        <tr style="cursor:default;">
+                            <td>@(string.IsNullOrWhiteSpace(defect.Category) ? "Unclassified" : defect.Category)</td>
+                            <td><SeverityBadge Severity="@defect.Severity" /></td>
+                            <td class="num" style="text-align:right;">@FormatPercent(defect.ConfidencePercent)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    @if (Inspection.Review is not null && !string.IsNullOrWhiteSpace(Inspection.Review.Status))
+    {
+        <hr class="divider" />
+
+        <div class="stack-3">
+            <span class="eyebrow">Review</span>
+
+            <dl class="defs">
+                <dt>Status</dt>
+                <dd>@Inspection.Review.Status</dd>
+
+                @if (!string.IsNullOrWhiteSpace(Inspection.Review.CorrectedResult))
+                {
+                    <dt>Corrected to</dt>
+                    <dd>@Inspection.Review.CorrectedResult</dd>
+                }
+
+                <dt>Reviewed by</dt>
+                <dd>@(string.IsNullOrWhiteSpace(Inspection.Review.ReviewedBy) ? "—" : Inspection.Review.ReviewedBy)</dd>
+
+                <dt>Reviewed at</dt>
+                <dd>@FormatTimestamp(Inspection.Review.ReviewedAtUtc)</dd>
+            </dl>
+
+            @if (!string.IsNullOrWhiteSpace(Inspection.Review.Notes))
+            {
+                <p class="text-muted" style="font-size:var(--t-sm);">@Inspection.Review.Notes</p>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public InspectionDto Inspection { get; set; } = new();
+
+    /// <summary>Local preview (data URL) shown before the API returns a stored image URL.</summary>
+    [Parameter]
+    public string? PreviewSrc { get; set; }
+
+    [Parameter]
+    public bool ShowMeta { get; set; } = true;
+
+    private string? ImageSrc =>
+        !string.IsNullOrWhiteSpace(Inspection.ImageUrl)
+            ? Api.ResolveMediaUrl(Inspection.ImageUrl)
+            : PreviewSrc;
+
+    private string ImageAlt =>
+        $"Inspected surface of {Inspection.ProductLabel}, classified {(Inspection.IsDefective ? "defective" : "pass")}";
+
+    private IEnumerable<DefectDto> BoxedDefects =>
+        Inspection.Defects.Where(d => d.BoundingBox is not null && HasUsableCoordinates(d.BoundingBox!));
+
+    private bool HasUsableCoordinates(BoundingBoxDto box) =>
+        box.Width > 0 && box.Height > 0 &&
+        (box.IsNormalised || (Inspection.ImageWidth > 0 && Inspection.ImageHeight > 0));
+
+    /// <summary>Boxes arrive either normalised (0–1) or in source pixels; both map to percentages.</summary>
+    private string BoxStyle(BoundingBoxDto box)
+    {
+        double left, top, width, height;
+
+        if (box.IsNormalised)
+        {
+            left = box.X * 100;
+            top = box.Y * 100;
+            width = box.Width * 100;
+            height = box.Height * 100;
+        }
+        else
+        {
+            var sourceWidth = Inspection.ImageWidth ?? 0;
+            var sourceHeight = Inspection.ImageHeight ?? 0;
+
+            if (sourceWidth <= 0 || sourceHeight <= 0)
+            {
+                return "display:none;";
+            }
+
+            left = box.X / sourceWidth * 100;
+            top = box.Y / sourceHeight * 100;
+            width = box.Width / sourceWidth * 100;
+            height = box.Height / sourceHeight * 100;
+        }
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"left:{Clamp(left):0.##}%; top:{Clamp(top):0.##}%; width:{Clamp(width):0.##}%; height:{Clamp(height):0.##}%;");
+    }
+
+    private static double Clamp(double value) => Math.Clamp(value, 0, 100);
+
+    private static string CssPercent(double percent) =>
+        percent.ToString("0.##", CultureInfo.InvariantCulture) + "%";
+
+    private static string FormatPercent(double percent) =>
+        percent.ToString("0.#", CultureInfo.InvariantCulture) + "%";
+
+    private static string FormatTimestamp(DateTime? value) =>
+        value is null
+            ? "—"
+            : value.Value.ToLocalTime().ToString("dd MMM yyyy, HH:mm", CultureInfo.InvariantCulture);
+}

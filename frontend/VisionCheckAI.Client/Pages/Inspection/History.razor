@@ -1,0 +1,335 @@
+@page "/inspection/history"
+@attribute [Authorize]
+@using System.Globalization
+@inject IProductApi ProductApi
+@inject IInspectionApi InspectionApi
+@inject ApiSettings Api
+
+<PageTitle>History · VisionCheck AI</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Inspection history</h1>
+        <p class="page-subtitle">Every part scanned on this line, with its AI verdict and review state.</p>
+    </div>
+
+    <button type="button" class="btn" @onclick="ResetFiltersAsync" disabled="@_isLoading">
+        <Icon Name="filter" Size="14" />
+        <span>Clear filters</span>
+    </button>
+</div>
+
+<section class="panel">
+    <div class="filter-bar">
+        <div class="field">
+            <label class="field-label" for="f-product">Product</label>
+            <select id="f-product" class="select" @bind="_query.ProductId" @bind:after="ApplyFiltersAsync">
+                <option value="">All products</option>
+                @foreach (var product in _products)
+                {
+                    <option value="@product.Id">@product.Label</option>
+                }
+            </select>
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="f-from">From</label>
+            <input id="f-from" type="date" class="input" @bind="_fromDate" @bind:after="ApplyFiltersAsync" />
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="f-to">To</label>
+            <input id="f-to" type="date" class="input" @bind="_toDate" @bind:after="ApplyFiltersAsync" />
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="f-category">Defect category</label>
+            <select id="f-category" class="select" @bind="_query.DefectCategory" @bind:after="ApplyFiltersAsync">
+                <option value="">All categories</option>
+                @foreach (var category in DefectCategories.All)
+                {
+                    <option value="@category">@category</option>
+                }
+            </select>
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="f-severity">Severity</label>
+            <select id="f-severity" class="select" @bind="_query.Severity" @bind:after="ApplyFiltersAsync">
+                <option value="">All severities</option>
+                @foreach (var severity in Severities.All)
+                {
+                    <option value="@severity">@severity</option>
+                }
+            </select>
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="f-result">Result</label>
+            <select id="f-result" class="select" @bind="_query.Result" @bind:after="ApplyFiltersAsync">
+                <option value="">All results</option>
+                <option value="@InspectionResults.Pass">Pass</option>
+                <option value="@InspectionResults.Defective">Defective</option>
+            </select>
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="f-size">Rows</label>
+            <select id="f-size" class="select" @bind="_query.PageSize" @bind:after="ApplyFiltersAsync">
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table">
+            <caption class="visually-hidden">Inspection records, newest first</caption>
+            <thead>
+                <tr>
+                    <th scope="col" class="cell-tight"><span class="visually-hidden">Image</span></th>
+                    <th scope="col">Product</th>
+                    <th scope="col">Inspected</th>
+                    <th scope="col">Operator</th>
+                    <th scope="col">AI result</th>
+                    <th scope="col">Severity</th>
+                    <th scope="col" style="text-align:right;">Confidence</th>
+                    <th scope="col">Review</th>
+                    <th scope="col" class="cell-tight"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (_isLoading)
+                {
+                    for (var i = 0; i < 6; i++)
+                    {
+                        <tr style="cursor:default;">
+                            <td><Skeleton Width="34px" Height="34px" Radius="3px" /></td>
+                            <td><Skeleton Width="140px" Height="12px" /></td>
+                            <td><Skeleton Width="110px" Height="12px" /></td>
+                            <td><Skeleton Width="80px" Height="12px" /></td>
+                            <td><Skeleton Width="64px" Height="12px" /></td>
+                            <td><Skeleton Width="56px" Height="12px" /></td>
+                            <td><Skeleton Width="44px" Height="12px" /></td>
+                            <td><Skeleton Width="64px" Height="12px" /></td>
+                            <td></td>
+                        </tr>
+                    }
+                }
+                else if (_page.Items.Count == 0)
+                {
+                    <tr style="cursor:default;">
+                        <td colspan="9">
+                            <div class="empty-state">
+                                <div class="empty-title">No inspections match these filters</div>
+                                <div>Widen the date range, or clear the filters to see everything.</div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var inspection in _page.Items)
+                    {
+                        <tr @key="inspection.Id" @onclick="() => OpenDetail(inspection)">
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(ThumbnailFor(inspection)))
+                                {
+                                    <img class="thumb" src="@ThumbnailFor(inspection)" alt="" loading="lazy" />
+                                }
+                                else
+                                {
+                                    <span class="thumb thumb-empty"><Icon Name="image" Size="14" /></span>
+                                }
+                            </td>
+                            <td>@inspection.ProductLabel</td>
+                            <td class="cell-muted num">@FormatTimestamp(inspection.Timestamp)</td>
+                            <td class="cell-muted">@(string.IsNullOrWhiteSpace(inspection.OperatorName) ? "—" : inspection.OperatorName)</td>
+                            <td><StatusBadge Result="@inspection.Result" /></td>
+                            <td><SeverityBadge Severity="@inspection.Severity" /></td>
+                            <td class="num" style="text-align:right;">@FormatPercent(inspection.ConfidencePercent)</td>
+                            <td>
+                                <span class="badge badge-neutral badge-plain">@ReviewStatusFor(inspection)</span>
+                            </td>
+                            <td class="cell-tight">
+                                <button type="button"
+                                        class="btn btn-ghost"
+                                        aria-label="@($"View inspection of {inspection.ProductLabel}")"
+                                        @onclick="() => OpenDetail(inspection)"
+                                        @onclick:stopPropagation="true">
+                                    View
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="panel-foot">
+        <span class="pager-status">
+            @if (_isLoading)
+            {
+                <span>Loading…</span>
+            }
+            else if (_page.TotalCount == 0)
+            {
+                <span>No records</span>
+            }
+            else
+            {
+                <span>@(_page.FirstRowNumber)–@(_page.LastRowNumber) of @(_page.TotalCount.ToString("N0", CultureInfo.InvariantCulture))</span>
+            }
+        </span>
+
+        <div class="pager">
+            <button type="button"
+                    class="btn btn-icon"
+                    aria-label="Previous page"
+                    disabled="@(_isLoading || _query.Page <= 1)"
+                    @onclick="() => GoToPageAsync(_query.Page - 1)">
+                <Icon Name="chevron-left" Size="14" />
+            </button>
+
+            <span class="pager-status">Page @_query.Page of @_page.TotalPages</span>
+
+            <button type="button"
+                    class="btn btn-icon"
+                    aria-label="Next page"
+                    disabled="@(_isLoading || _query.Page >= _page.TotalPages)"
+                    @onclick="() => GoToPageAsync(_query.Page + 1)">
+                <Icon Name="chevron-right" Size="14" />
+            </button>
+        </div>
+    </div>
+</section>
+
+@if (_error is not null)
+{
+    <div class="form-error" role="alert" style="margin-top:var(--s-3);">
+        <Icon Name="alert-triangle" Size="14" />
+        <span>@_error</span>
+    </div>
+}
+
+<Drawer IsOpen="@(_selected is not null)"
+        Title="@DrawerTitle"
+        OnClose="@CloseDetail">
+    @if (_selected is not null)
+    {
+        <InspectionResultView Inspection="@_selected" />
+    }
+</Drawer>
+
+@code {
+    private readonly InspectionQuery _query = new();
+    private PagedResult<InspectionDto> _page = new();
+    private IReadOnlyList<ProductDto> _products = Array.Empty<ProductDto>();
+
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
+
+    private bool _isLoading = true;
+    private string? _error;
+    private InspectionDto? _selected;
+
+    private string DrawerTitle => _selected is null
+        ? "Inspection"
+        : $"{_selected.ProductLabel} · {FormatTimestamp(_selected.Timestamp)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _products = await ProductApi.GetProductsAsync();
+        }
+        catch (ApiException)
+        {
+            // The table is still usable without the product filter.
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+
+        _query.FromUtc = _fromDate is null ? null : DateTime.SpecifyKind(_fromDate.Value.Date, DateTimeKind.Utc);
+        _query.ToUtc = _toDate is null
+            ? null
+            : DateTime.SpecifyKind(_toDate.Value.Date.AddDays(1).AddSeconds(-1), DateTimeKind.Utc);
+
+        try
+        {
+            _page = await InspectionApi.SearchAsync(_query);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+            _page = new PagedResult<InspectionDto> { Page = _query.Page, PageSize = _query.PageSize };
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        _query.Page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ResetFiltersAsync()
+    {
+        _query.ProductId = null;
+        _query.DefectCategory = null;
+        _query.Severity = null;
+        _query.Result = null;
+        _query.Page = 1;
+        _fromDate = null;
+        _toDate = null;
+
+        await LoadAsync();
+    }
+
+    private async Task GoToPageAsync(int page)
+    {
+        if (page < 1 || page > _page.TotalPages)
+        {
+            return;
+        }
+
+        _query.Page = page;
+        await LoadAsync();
+    }
+
+    private void OpenDetail(InspectionDto inspection) => _selected = inspection;
+
+    private void CloseDetail() => _selected = null;
+
+    private string? ThumbnailFor(InspectionDto inspection)
+    {
+        var path = !string.IsNullOrWhiteSpace(inspection.ThumbnailUrl)
+            ? inspection.ThumbnailUrl
+            : inspection.ImageUrl;
+
+        return string.IsNullOrWhiteSpace(path) ? null : Api.ResolveMediaUrl(path);
+    }
+
+    private static string ReviewStatusFor(InspectionDto inspection) =>
+        string.IsNullOrWhiteSpace(inspection.Review?.Status) ? "Pending" : inspection.Review!.Status!;
+
+    private static string FormatTimestamp(DateTime? value) =>
+        value is null
+            ? "—"
+            : value.Value.ToLocalTime().ToString("dd MMM yyyy, HH:mm", CultureInfo.InvariantCulture);
+
+    private static string FormatPercent(double percent) =>
+        percent.ToString("0.#", CultureInfo.InvariantCulture) + "%";
+}

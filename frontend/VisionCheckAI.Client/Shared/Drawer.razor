@@ -1,0 +1,81 @@
+@inject IJSRuntime JS
+
+@if (IsOpen)
+{
+    <div class="drawer-backdrop" @onclick="CloseAsync"></div>
+
+    <div class="drawer"
+         role="dialog"
+         aria-modal="true"
+         aria-label="@Title"
+         tabindex="-1"
+         @ref="_panel"
+         @onkeydown="OnKeyDownAsync">
+
+        <div class="drawer-head">
+            <h2 class="drawer-title">@Title</h2>
+            <button type="button"
+                    class="btn btn-ghost btn-icon"
+                    aria-label="Close panel"
+                    @onclick="CloseAsync">
+                <Icon Name="x" />
+            </button>
+        </div>
+
+        <div class="drawer-body">
+            @ChildContent
+        </div>
+    </div>
+}
+
+@code {
+    private ElementReference _panel;
+    private bool _focusPending;
+
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen)
+        {
+            _focusPending = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!IsOpen || !_focusPending)
+        {
+            return;
+        }
+
+        _focusPending = false;
+
+        try
+        {
+            await JS.InvokeVoidAsync("visionCheck.focusElement", _panel);
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            await CloseAsync();
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        if (OnClose.HasDelegate)
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
+}

@@ -1,0 +1,65 @@
+@* Severity split: one stacked bar, then the counts beneath it. *@
+
+@if (Total <= 0)
+{
+    <p class="text-muted" style="font-size:var(--t-sm);">No defects recorded for this period.</p>
+}
+else
+{
+    <div class="stack-4">
+        <div class="stack-bar" role="img" aria-label="@AriaLabel">
+            @foreach (var slice in Slices.Where(s => s.Count > 0))
+            {
+                <div class="stack-seg @slice.ModifierClass"
+                     style="width:@Percent(slice.Count)"
+                     title="@($"{slice.Label}: {slice.Count}")"></div>
+            }
+        </div>
+
+        <div class="stack-3">
+            @foreach (var slice in Slices)
+            {
+                <div class="bar-row" style="grid-template-columns: 96px minmax(0,1fr) 52px;">
+                    <span class="legend-item @slice.LegendClass">
+                        <span class="legend-swatch"></span>
+                        <span class="bar-label">@slice.Label</span>
+                    </span>
+
+                    <div class="bar-track">
+                        <div class="bar-fill @slice.ModifierClass" style="width:@Percent(slice.Count)"></div>
+                    </div>
+
+                    <span class="bar-value">@slice.Count</span>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<SeverityCountDto>? Counts { get; set; }
+
+    private sealed record Slice(string Label, int Count, string ModifierClass, string LegendClass);
+
+    private IReadOnlyList<Slice> Slices => new[]
+    {
+        new Slice(Severities.Low, CountFor(Severities.Low), "sev-low", "legend-low"),
+        new Slice(Severities.Medium, CountFor(Severities.Medium), "sev-medium", "legend-medium"),
+        new Slice(Severities.High, CountFor(Severities.High), "sev-high", "legend-high")
+    };
+
+    private int Total => Slices.Sum(s => s.Count);
+
+    private string AriaLabel => string.Join(", ", Slices.Select(s => $"{s.Label} {s.Count}"));
+
+    private int CountFor(string severity) =>
+        Counts?.Where(c => string.Equals(c.Severity, severity, StringComparison.OrdinalIgnoreCase))
+               .Sum(c => c.Count) ?? 0;
+
+    private string Percent(int count)
+    {
+        if (Total <= 0) return "0%";
+        var pct = count / (double)Total * 100.0;
+        return pct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    }
+}

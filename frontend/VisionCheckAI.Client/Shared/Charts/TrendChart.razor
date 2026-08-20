@@ -1,0 +1,183 @@
+@* Daily trend. Hand-rolled SVG: thin lines, muted gridlines, no chart junk. *@
+@using System.Globalization
+
+@if (Points is null || Points.Count == 0)
+{
+    <p class="text-muted" style="font-size:var(--t-sm);">No inspections recorded for this period.</p>
+}
+else
+{
+    <div class="stack-4">
+        <svg class="chart"
+             viewBox="0 0 1080 240"
+             preserveAspectRatio="xMidYMid meet"
+             role="img"
+             aria-label="@AriaLabel">
+
+            @foreach (var line in _gridLines)
+            {
+                <line class="chart-grid" x1="@Fmt(PadL)" y1="@Fmt(line.Y)" x2="@Fmt(W - PadR)" y2="@Fmt(line.Y)" />
+                <SvgText Class="chart-axis-label" X="@(PadL - 8)" Y="@(line.Y + 3)" Anchor="end" Value="@line.Label" />
+            }
+
+            @foreach (var label in _xLabels)
+            {
+                <SvgText Class="chart-axis-label" X="@label.X" Y="@(H - 8)" Anchor="@label.Anchor" Value="@label.Text" />
+            }
+
+            <polyline class="chart-line chart-line-pass" points="@_passPoints" />
+            <polyline class="chart-line chart-line-defect" points="@_defectPoints" />
+            <polyline class="chart-line chart-line-accent" points="@_totalPoints" />
+
+            @foreach (var marker in _markers)
+            {
+                <circle class="chart-point"
+                        cx="@Fmt(marker.X)"
+                        cy="@Fmt(marker.Y)"
+                        r="2.5"
+                        stroke="var(--accent)">
+                    <title>@marker.Tooltip</title>
+                </circle>
+            }
+        </svg>
+
+        <div class="legend">
+            <span class="legend-item legend-accent"><span class="legend-swatch"></span>Total</span>
+            <span class="legend-item legend-pass"><span class="legend-swatch"></span>Pass</span>
+            <span class="legend-item legend-defect"><span class="legend-swatch"></span>Defective</span>
+        </div>
+    </div>
+}
+
+@code {
+    private const double W = 1080;
+    private const double H = 240;
+    private const double PadL = 42;
+    private const double PadR = 12;
+    private const double PadT = 14;
+    private const double PadB = 28;
+
+    [Parameter] public IReadOnlyList<DailyTrendPointDto>? Points { get; set; }
+
+    private readonly List<GridLine> _gridLines = new();
+    private readonly List<AxisLabel> _xLabels = new();
+    private readonly List<Marker> _markers = new();
+
+    private string _totalPoints = string.Empty;
+    private string _passPoints = string.Empty;
+    private string _defectPoints = string.Empty;
+
+    private sealed record GridLine(double Y, string Label);
+    private sealed record AxisLabel(double X, string Text, string Anchor);
+    private sealed record Marker(double X, double Y, string Tooltip);
+
+    private string AriaLabel =>
+        Points is null || Points.Count == 0
+            ? "Daily trend chart, no data"
+            : $"Daily inspection trend across {Points.Count} days, peak of {Points.Max(p => p.Total)} inspections in a day";
+
+    protected override void OnParametersSet()
+    {
+        _gridLines.Clear();
+        _xLabels.Clear();
+        _markers.Clear();
+        _totalPoints = _passPoints = _defectPoints = string.Empty;
+
+        if (Points is null || Points.Count == 0)
+        {
+            return;
+        }
+
+        var ordered = Points.OrderBy(p => p.Date).ToList();
+        var plotW = W - PadL - PadR;
+        var plotH = H - PadT - PadB;
+
+        var rawMax = ordered.Max(p => Math.Max(p.Total, Math.Max(p.Pass, p.Defective)));
+        var max = NiceCeiling(rawMax);
+
+        double X(int index) => ordered.Count == 1
+            ? PadL + (plotW / 2)
+            : PadL + (index * plotW / (ordered.Count - 1));
+
+        double Y(double value) => PadT + plotH - (max <= 0 ? 0 : value / max * plotH);
+
+        // Four horizontal gridlines, bottom-up.
+        for (var step = 0; step <= 3; step++)
+        {
+            var value = max * step / 3.0;
+            _gridLines.Add(new GridLine(Y(value), Math.Round(value).ToString("0", CultureInfo.InvariantCulture)));
+        }
+
+        _totalPoints = BuildPolyline(ordered, X, Y, p => p.Total);
+        _passPoints = BuildPolyline(ordered, X, Y, p => p.Pass);
+        _defectPoints = BuildPolyline(ordered, X, Y, p => p.Defective);
+
+        // Sparse x labels so the axis never crowds.
+        var labelStride = Math.Max(1, (int)Math.Ceiling(ordered.Count / 7.0));
+        for (var i = 0; i < ordered.Count; i += labelStride)
+        {
+            // End labels anchor inward so they never collide with the y-axis or clip.
+            var anchor = i == 0 ? "start" : i >= ordered.Count - 1 ? "end" : "middle";
+
+            _xLabels.Add(new AxisLabel(
+                X(i),
+                ordered[i].Date.ToString("dd MMM", CultureInfo.InvariantCulture),
+                anchor));
+        }
+
+        if (ordered.Count <= 31)
+        {
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                var point = ordered[i];
+                var tooltip = $"{point.Date.ToString("dd MMM yyyy", CultureInfo.InvariantCulture)} — {point.Total} inspected, {point.Pass} pass, {point.Defective} defective";
+                _markers.Add(new Marker(X(i), Y(point.Total), tooltip));
+            }
+        }
+    }
+
+    private static string BuildPolyline(
+        IReadOnlyList<DailyTrendPointDto> points,
+        Func<int, double> x,
+        Func<double, double> y,
+        Func<DailyTrendPointDto, int> selector)
+    {
+        var parts = new string[points.Count];
+
+        for (var i = 0; i < points.Count; i++)
+        {
+            parts[i] = $"{Fmt(x(i))},{Fmt(y(selector(points[i])))}";
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>
+    /// Rounds the axis maximum to three readable intervals, so the four gridlines
+    /// land on round numbers without leaving the series stranded at the bottom.
+    /// </summary>
+    private static double NiceCeiling(int value)
+    {
+        if (value <= 3) return 3;
+
+        var target = value / 3.0;
+        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(target)));
+        var normalised = target / magnitude;
+
+        var step = normalised switch
+        {
+            <= 1 => 1.0,
+            <= 1.5 => 1.5,
+            <= 2 => 2.0,
+            <= 2.5 => 2.5,
+            <= 4 => 4.0,
+            <= 5 => 5.0,
+            <= 8 => 8.0,
+            _ => 10.0
+        };
+
+        return step * magnitude * 3.0;
+    }
+
+    private static string Fmt(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+}

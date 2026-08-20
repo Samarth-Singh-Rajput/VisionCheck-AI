@@ -1,0 +1,413 @@
+@page "/inspection/new"
+@attribute [Authorize]
+@using System.Globalization
+@inject IProductApi ProductApi
+@inject IInspectionApi InspectionApi
+@inject ToastService Toasts
+
+<PageTitle>New inspection · VisionCheck AI</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">New inspection</h1>
+        <p class="page-subtitle">Capture a surface image and run the classifier against it.</p>
+    </div>
+</div>
+
+<div class="grid split-2">
+
+    @* ------------------------------ Capture ------------------------------ *@
+    <section class="panel">
+        <div class="panel-head">
+            <h2 class="panel-title">Capture</h2>
+            <span class="eyebrow">Step 1</span>
+        </div>
+
+        <div class="panel-body stack-4">
+            <div class="field">
+                <label class="field-label" for="product">Product</label>
+                <select id="product" class="select" @bind="_productId" disabled="@(_isRunning || _isLoadingProducts)">
+                    <option value="">@(_isLoadingProducts ? "Loading products…" : "Select a product")</option>
+                    @foreach (var product in _products)
+                    {
+                        <option value="@product.Id">@product.Label</option>
+                    }
+                </select>
+            </div>
+
+            <div class="field">
+                <span class="field-label" id="upload-label">Surface image</span>
+
+                <div class="dropzone @(_isDragging ? "is-dragging" : null) @(_fileBytes is not null ? "has-file" : null)"
+                     @ondragenter="() => _isDragging = true"
+                     @ondragover:preventDefault="true"
+                     @ondragleave="() => _isDragging = false"
+                     @ondrop="() => _isDragging = false">
+
+                    <InputFile id="image"
+                               accept="image/png,image/jpeg,image/webp"
+                               aria-labelledby="upload-label"
+                               OnChange="@OnFileSelectedAsync"
+                               @key="_inputKey"
+                               disabled="@_isRunning" />
+
+                    @if (_fileBytes is null)
+                    {
+                        <span class="dropzone-icon"><Icon Name="upload" Size="20" /></span>
+                        <span class="dropzone-title">Drop an image, or click to browse</span>
+                        <span class="dropzone-hint">JPEG, PNG or WebP · up to @MaxFileMb MB</span>
+                    }
+                    else
+                    {
+                        <span class="file-chip">
+                            <Icon Name="image" Size="14" />
+                            <span class="file-name">@_fileName</span>
+                            <span class="text-faint num" style="margin-left:auto;">@FileSizeLabel</span>
+                        </span>
+                    }
+                </div>
+            </div>
+
+            @if (_previewSrc is not null && _result is null)
+            {
+                <div class="frame">
+                    <img src="@_previewSrc" alt="Selected surface image, awaiting inspection" />
+                </div>
+            }
+
+            @if (_error is not null)
+            {
+                <div class="form-error" role="alert">
+                    <Icon Name="alert-triangle" Size="14" />
+                    <span>@_error</span>
+                </div>
+            }
+
+            <div style="display:flex; gap:var(--s-2); align-items:center;">
+                <button type="button"
+                        class="btn btn-primary btn-lg"
+                        disabled="@(!CanRun)"
+                        @onclick="RunInspectionAsync">
+                    @if (_isRunning)
+                    {
+                        <Icon Name="loader" Size="14" Class="spin" />
+                        <span>Running…</span>
+                    }
+                    else
+                    {
+                        <Icon Name="scan" Size="14" />
+                        <span>Run AI inspection</span>
+                    }
+                </button>
+
+                @if (_fileBytes is not null && !_isRunning)
+                {
+                    <button type="button" class="btn btn-ghost" @onclick="ClearSelection">Clear</button>
+                }
+            </div>
+        </div>
+    </section>
+
+    @* ------------------------------- Result ------------------------------ *@
+    <section class="panel">
+        <div class="panel-head">
+            <h2 class="panel-title">Result</h2>
+            <span class="eyebrow">Step 2</span>
+        </div>
+
+        <div class="panel-body">
+            @if (_isRunning)
+            {
+                <div class="stack-4" aria-live="polite">
+                    <Skeleton Height="220px" Radius="5px" />
+                    <Skeleton Width="180px" Height="20px" />
+                    <Skeleton Height="3px" />
+                    <Skeleton Height="14px" />
+                    <Skeleton Width="70%" Height="14px" />
+                    <p class="text-muted" style="font-size:var(--t-sm);">
+                        Classifying surface condition…
+                    </p>
+                </div>
+            }
+            else if (_result is null)
+            {
+                <div class="frame-empty" style="min-height:280px; text-align:center; padding:var(--s-6);">
+                    Select a product and an image, then run the inspection.<br />
+                    Results, defect boxes and the review action appear here.
+                </div>
+            }
+            else
+            {
+                <div class="stack-4">
+                    <InspectionResultView Inspection="@_result" PreviewSrc="@_previewSrc" />
+
+                    <hr class="divider" />
+
+                    @* ----------------------------- Review ----------------------------- *@
+                    <div class="stack-3">
+                        <span class="eyebrow">Review</span>
+
+                        @if (IsReviewed)
+                        {
+                            <p class="text-muted" style="font-size:var(--t-sm);">
+                                This inspection has been @(_result.Review?.Status?.ToLowerInvariant() ?? "reviewed").
+                            </p>
+                        }
+                        else if (_isOverriding)
+                        {
+                            <div class="field">
+                                <label class="field-label" for="corrected">Corrected result</label>
+                                <select id="corrected" class="select" @bind="_correctedResult">
+                                    <option value="@InspectionResults.Pass">Pass</option>
+                                    <option value="@InspectionResults.Defective">Defective</option>
+                                </select>
+                            </div>
+
+                            <div class="field">
+                                <label class="field-label" for="notes">Notes</label>
+                                <textarea id="notes"
+                                          class="textarea"
+                                          placeholder="Why the AI verdict is being changed"
+                                          @bind="_notes"
+                                          @bind:event="oninput"></textarea>
+                            </div>
+
+                            <div style="display:flex; gap:var(--s-2);">
+                                <button type="button"
+                                        class="btn btn-primary"
+                                        disabled="@(_isSubmittingReview || string.IsNullOrWhiteSpace(_notes))"
+                                        @onclick="() => SubmitReviewAsync(confirm: false)">
+                                    Save override
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-ghost"
+                                        disabled="@_isSubmittingReview"
+                                        @onclick="() => _isOverriding = false">
+                                    Cancel
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div style="display:flex; gap:var(--s-2); flex-wrap:wrap;">
+                                <button type="button"
+                                        class="btn"
+                                        disabled="@_isSubmittingReview"
+                                        @onclick="() => SubmitReviewAsync(confirm: true)">
+                                    <Icon Name="check" Size="14" />
+                                    <span>Confirm AI result</span>
+                                </button>
+
+                                <AuthorizeView Roles="@UserRoles.CanOverride">
+                                    <Authorized>
+                                        <button type="button"
+                                                class="btn btn-danger-quiet"
+                                                disabled="@_isSubmittingReview"
+                                                @onclick="StartOverride">
+                                            Override
+                                        </button>
+                                    </Authorized>
+                                    <NotAuthorized>
+                                        <span class="text-faint" style="font-size:var(--t-xs); align-self:center;">
+                                            Overrides require a supervisor.
+                                        </span>
+                                    </NotAuthorized>
+                                </AuthorizeView>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+</div>
+
+@code {
+    private const int MaxFileMb = 10;
+    private const long MaxFileBytes = MaxFileMb * 1024L * 1024L;
+
+    private IReadOnlyList<ProductDto> _products = Array.Empty<ProductDto>();
+    private bool _isLoadingProducts = true;
+
+    private string _productId = string.Empty;
+    private byte[]? _fileBytes;
+    private string? _fileName;
+    private string _contentType = "application/octet-stream";
+    private string? _previewSrc;
+    private Guid _inputKey = Guid.NewGuid();
+
+    private bool _isDragging;
+    private bool _isRunning;
+    private string? _error;
+
+    private InspectionDto? _result;
+    private bool _isOverriding;
+    private bool _isSubmittingReview;
+    private string _correctedResult = InspectionResults.Pass;
+    private string _notes = string.Empty;
+
+    private bool CanRun => !_isRunning && _fileBytes is not null && !string.IsNullOrWhiteSpace(_productId);
+
+    private bool IsReviewed =>
+        _result?.Review is not null &&
+        !string.IsNullOrWhiteSpace(_result.Review.Status) &&
+        !_result.Review.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase);
+
+    private string FileSizeLabel =>
+        _fileBytes is null
+            ? "—"
+            : (_fileBytes.Length / 1024.0 / 1024.0).ToString("0.0", CultureInfo.InvariantCulture) + " MB";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _products = await ProductApi.GetProductsAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoadingProducts = false;
+        }
+    }
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs args)
+    {
+        _isDragging = false;
+        _error = null;
+
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        if (file.Size > MaxFileBytes)
+        {
+            _error = $"That image is {file.Size / 1024.0 / 1024.0:0.0} MB. The limit is {MaxFileMb} MB.";
+            ClearSelection();
+            return;
+        }
+
+        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            _error = "Select a JPEG, PNG or WebP image.";
+            ClearSelection();
+            return;
+        }
+
+        try
+        {
+            await using var stream = file.OpenReadStream(MaxFileBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+
+            _fileBytes = buffer.ToArray();
+            _fileName = file.Name;
+            _contentType = file.ContentType;
+            _previewSrc = $"data:{_contentType};base64,{Convert.ToBase64String(_fileBytes)}";
+            _result = null;
+            _isOverriding = false;
+        }
+        catch (IOException)
+        {
+            _error = "That image could not be read. Try selecting it again.";
+            ClearSelection();
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _fileBytes = null;
+        _fileName = null;
+        _previewSrc = null;
+        _result = null;
+        _isOverriding = false;
+        _inputKey = Guid.NewGuid();
+    }
+
+    private async Task RunInspectionAsync()
+    {
+        if (!CanRun)
+        {
+            return;
+        }
+
+        _isRunning = true;
+        _error = null;
+        _result = null;
+
+        try
+        {
+            _result = await InspectionApi.UploadAsync(
+                _productId,
+                _fileBytes!,
+                _fileName ?? "capture.jpg",
+                _contentType);
+
+            _correctedResult = _result.IsDefective ? InspectionResults.Pass : InspectionResults.Defective;
+
+            Toasts.Show(
+                _result.IsDefective ? ToastLevel.Error : ToastLevel.Success,
+                _result.IsDefective ? "Defect detected" : "Part passed",
+                $"{_result.ConfidencePercent.ToString("0.#", CultureInfo.InvariantCulture)}% confidence");
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+            Toasts.ShowError("Inspection failed", ex.Message);
+        }
+        finally
+        {
+            _isRunning = false;
+        }
+    }
+
+    private void StartOverride()
+    {
+        _isOverriding = true;
+        _notes = string.Empty;
+        _correctedResult = _result is not null && _result.IsDefective
+            ? InspectionResults.Pass
+            : InspectionResults.Defective;
+    }
+
+    private async Task SubmitReviewAsync(bool confirm)
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        _isSubmittingReview = true;
+
+        try
+        {
+            var request = new ReviewRequest
+            {
+                IsConfirmed = confirm,
+                CorrectedResult = confirm ? null : _correctedResult,
+                Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim()
+            };
+
+            _result = await InspectionApi.ReviewAsync(_result.Id, request);
+            _isOverriding = false;
+
+            Toasts.ShowSuccess(
+                confirm ? "AI result confirmed" : "Result overridden",
+                confirm ? null : $"Recorded as {_correctedResult}.");
+        }
+        catch (ApiException ex)
+        {
+            Toasts.ShowError("Review not saved", ex.Message);
+        }
+        finally
+        {
+            _isSubmittingReview = false;
+        }
+    }
+}

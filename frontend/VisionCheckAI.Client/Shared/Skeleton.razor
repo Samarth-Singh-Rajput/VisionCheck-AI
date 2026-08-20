@@ -1,0 +1,7 @@
+<div class="skeleton" style="width:@Width; height:@Height; border-radius:@Radius;" aria-hidden="true"></div>
+
+@code {
+    [Parameter] public string Width { get; set; } = "100%";
+    [Parameter] public string Height { get; set; } = "12px";
+    [Parameter] public string Radius { get; set; } = "3px";
+}

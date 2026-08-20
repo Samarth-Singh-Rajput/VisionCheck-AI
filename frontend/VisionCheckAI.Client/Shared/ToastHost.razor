@@ -1,0 +1,53 @@
+@implements IDisposable
+@inject ToastService Toasts
+
+@if (Toasts.Toasts.Count > 0)
+{
+    <div class="toast-host" aria-live="polite" aria-atomic="false">
+        @foreach (var toast in Toasts.Toasts)
+        {
+            <div class="toast @LevelClass(toast.Level)" role="@RoleFor(toast.Level)" @key="toast.Id">
+                <span class="toast-icon"><Icon Name="@IconFor(toast.Level)" /></span>
+
+                <div>
+                    <div class="toast-title">@toast.Title</div>
+                    @if (!string.IsNullOrWhiteSpace(toast.Detail))
+                    {
+                        <div class="toast-detail">@toast.Detail</div>
+                    }
+                </div>
+
+                <button type="button"
+                        class="btn btn-ghost btn-icon toast-close"
+                        aria-label="Dismiss notification"
+                        @onclick="() => Toasts.Dismiss(toast.Id)">
+                    <Icon Name="x" Size="14" />
+                </button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    protected override void OnInitialized() => Toasts.Changed += OnToastsChanged;
+
+    private void OnToastsChanged() => InvokeAsync(StateHasChanged);
+
+    private static string LevelClass(ToastLevel level) => level switch
+    {
+        ToastLevel.Success => "toast-success",
+        ToastLevel.Error => "toast-error",
+        _ => "toast-info"
+    };
+
+    private static string IconFor(ToastLevel level) => level switch
+    {
+        ToastLevel.Success => "check-circle",
+        ToastLevel.Error => "alert-triangle",
+        _ => "info"
+    };
+
+    private static string RoleFor(ToastLevel level) => level == ToastLevel.Error ? "alert" : "status";
+
+    public void Dispose() => Toasts.Changed -= OnToastsChanged;
+}
