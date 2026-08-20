@@ -5,13 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using VisionCheckAI.Client;
 using VisionCheckAI.Client.Services;
 using VisionCheckAI.Client.Services.Fakes;
-
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
-
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
-
-// API host comes from wwwroot/appsettings.json (+ appsettings.{Environment}.json).
 var apiBaseUrl = builder.Configuration["Api:BaseUrl"];
 if (string.IsNullOrWhiteSpace(apiBaseUrl))
 {
@@ -20,14 +16,11 @@ if (string.IsNullOrWhiteSpace(apiBaseUrl))
 
 var apiSettings = new ApiSettings { BaseUrl = apiBaseUrl };
 builder.Services.AddSingleton(apiSettings);
-
 builder.Services.AddSingleton<BrowserStorage>();
 builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSingleton<ThemeService>();
 builder.Services.AddSingleton<ToastService>();
-
 builder.Services.AddScoped<AuthTokenHandler>();
-
 builder.Services
     .AddHttpClient(ApiSettings.HttpClientName, client =>
     {
@@ -35,12 +28,7 @@ builder.Services
         client.Timeout = TimeSpan.FromMinutes(2);
     })
     .AddHttpMessageHandler<AuthTokenHandler>();
-
-// Frontend-only mode: serve every screen from in-memory data so the UI can be
-// exercised with no backend running. Defaults to true; set Api:UseFakeData to false
-// in wwwroot/appsettings.json to talk to the real API over HttpClient.
 var useFakeData = builder.Configuration.GetValue<bool?>("Api:UseFakeData") ?? true;
-
 if (useFakeData)
 {
     builder.Services.AddScoped<IAuthApi, FakeAuthApi>();
@@ -55,7 +43,6 @@ else
     builder.Services.AddScoped<IInspectionApi, InspectionApi>();
     builder.Services.AddScoped<IDashboardApi, DashboardApi>();
 }
-
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, VisionCheckAuthStateProvider>();
 
