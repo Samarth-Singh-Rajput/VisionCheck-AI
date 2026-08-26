@@ -57,9 +57,18 @@ public class InspectionsController : ControllerBase
         var isDefective = !string.Equals(inference.Prediction, "Excellent", StringComparison.OrdinalIgnoreCase);
         var resultText = isDefective ? "Defective" : "Pass";
 
-        var severity = isDefective
-            ? (inference.Confidence > 0.95 ? "High" : inference.Confidence > 0.85 ? "Medium" : "Low")
-            : null;
+        string? severity = null;
+        if (isDefective)
+        {
+            severity = inference.Prediction switch
+            {
+                "Fracture" => "Critical",
+                "Deformation" => "High",
+                "Rusting" => "Medium",
+                "Scratches" => "Low",
+                _ => inference.Confidence > 0.90 ? "High" : "Medium"
+            };
+        }
 
         var product = await _db.Products.FindAsync(productId)
                       ?? await _db.Products.FirstOrDefaultAsync();

@@ -11,3 +11,13 @@ __pycache__/
 .DS_Store
 
 .streamlit/secrets.toml
+
+# .NET Build Output & SQLite Databases
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.db
+*.db-journal
+wwwroot/uploads/*
+!wwwroot/uploads/.gitkeep

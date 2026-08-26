@@ -1,5 +1,6 @@
 import sys
 import json
+import argparse
 from pathlib import Path
 
 import torch
@@ -14,6 +15,11 @@ from PIL import Image
 BASE_DIR = Path(__file__).resolve().parent
 
 MODEL_PATH = BASE_DIR / "best_efficientnet_b0.pth"
+if not MODEL_PATH.exists():
+    ALT_MODEL_PATH = BASE_DIR / "best_efficientnet_b0 (1).pth"
+    if ALT_MODEL_PATH.exists():
+        MODEL_PATH = ALT_MODEL_PATH
+
 CONFIG_PATH = BASE_DIR / "model_config.json"
 
 
@@ -28,11 +34,9 @@ elif torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
 
-sys.stderr.write(f"Using device: {DEVICE}\n")
-
 
 # ============================================================
-# Load configuration
+# Load configuration & Model lazily / globally
 # ============================================================
 
 with open(CONFIG_PATH, "r") as f:
@@ -44,53 +48,25 @@ MEAN = config["mean"]
 STD = config["std"]
 INPUT_SIZE = config["input_size"]
 
-sys.stderr.write(f"Classes: {CLASS_NAMES}\n")
 
+def get_model():
+    model = models.efficientnet_b0(weights=None)
+    num_features = model.classifier[1].in_features
+    model.classifier[1] = torch.nn.Linear(num_features, NUM_CLASSES)
 
-# ============================================================
-# Build model
-# ============================================================
-
-model = models.efficientnet_b0(weights=None)
-
-num_features = model.classifier[1].in_features
-
-model.classifier[1] = torch.nn.Linear(
-    num_features,
-    NUM_CLASSES
-)
-
-
-# ============================================================
-# Load trained weights
-# ============================================================
-
-if MODEL_PATH.exists():
-    state_dict = torch.load(
-        MODEL_PATH,
-        map_location=DEVICE
-    )
+    state_dict = torch.load(MODEL_PATH, map_location=DEVICE)
     model.load_state_dict(state_dict)
-    sys.stderr.write("Model loaded successfully from checkpoint.\n")
-else:
-    sys.stderr.write(f"Warning: Checkpoint {MODEL_PATH} not found. Initialized with default weights.\n")
-
-model = model.to(DEVICE)
-model.eval()
+    model = model.to(DEVICE)
+    model.eval()
+    return model
 
 
-# ============================================================
-# Image preprocessing
-# ============================================================
-
+# Preprocessing pipeline
 transform = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(INPUT_SIZE),
     transforms.ToTensor(),
-    transforms.Normalize(
-        mean=MEAN,
-        std=STD
-    )
+    transforms.Normalize(mean=MEAN, std=STD)
 ])
 
 
@@ -98,78 +74,63 @@ transform = transforms.Compose([
 # Prediction function
 # ============================================================
 
-def predict_image(image_path, quiet=False):
-
+def predict_image(image_path, json_output=False):
     image_path = Path(image_path)
 
     if not image_path.exists():
-        raise FileNotFoundError(
-            f"Image not found: {image_path}"
-        )
+        raise FileNotFoundError(f"Image not found: {image_path}")
 
-    # Heuristic for demo / sample images if file name contains defect keyword
-    filename_lower = image_path.name.lower()
-    forced_class = None
-    if "rust" in filename_lower:
-        forced_class = "Rusting"
-    elif "scratch" in filename_lower:
-        forced_class = "Scratches"
-    elif "deform" in filename_lower:
-        forced_class = "Deformation"
-    elif "fracture" in filename_lower:
-        forced_class = "Fracture"
-    elif "excel" in filename_lower or "pass" in filename_lower:
-        forced_class = "Excellent"
+    model = get_model()
 
     image = Image.open(image_path).convert("RGB")
-
-    input_tensor = transform(image)
-    input_tensor = input_tensor.unsqueeze(0)
-    input_tensor = input_tensor.to(DEVICE)
+    input_tensor = transform(image).unsqueeze(0).to(DEVICE)
 
     with torch.no_grad():
-
         outputs = model(input_tensor)
+        probabilities = torch.softmax(outputs, dim=1)[0]
 
-        probabilities = torch.softmax(
-            outputs,
-            dim=1
-        )[0]
+    confidence, predicted_index = torch.max(probabilities, dim=0)
+    predicted_class = CLASS_NAMES[predicted_index.item()]
+    confidence_val = confidence.item()
 
-    confidence, predicted_index = torch.max(
-        probabilities,
-        dim=0
-    )
+    # Probability dictionary mapping
+    probs_dict = {
+        class_name: prob
+        for class_name, prob in zip(CLASS_NAMES, probabilities.tolist())
+    }
 
-    predicted_class = CLASS_NAMES[
-        predicted_index.item()
-    ]
-    confidence = confidence.item()
+    if json_output:
+        result_json = {
+            "prediction": predicted_class,
+            "confidence": confidence_val,
+            "probabilities": probs_dict
+        }
+        print(json.dumps(result_json))
+        return result_json
 
-    if forced_class and not MODEL_PATH.exists():
-        predicted_class = forced_class
-        confidence = 0.965
-
-    # Sort probabilities from highest to lowest
+    # Formatted terminal display
     results = sorted(
-        zip(CLASS_NAMES, probabilities.tolist()),
+        probs_dict.items(),
         key=lambda x: x[1],
         reverse=True
     )
 
-    if not quiet:
-        sys.stderr.write("\n========================================\n")
-        sys.stderr.write("       NUT SURFACE CLASSIFICATION\n")
-        sys.stderr.write("========================================\n")
-        sys.stderr.write(f"\nImage: {image_path}\n")
-        sys.stderr.write(f"Prediction: {predicted_class}\n")
-        sys.stderr.write(f"Confidence: {confidence * 100:.2f}%\n")
-
+    print("\n========================================")
+    print("       NUT SURFACE CLASSIFICATION")
+    print("========================================")
+    print(f"\nImage: {image_path}")
+    print(f"Prediction: {predicted_class}")
+    print(f"Confidence: {confidence_val * 100:.2f}%")
+    print("\nClass probabilities:")
+    print("----------------------------------------")
+    for class_name, probability in results:
+        print(f"{class_name:15s} {probability * 100:6.2f}%")
+    print("----------------------------------------")
 
     return {
         "prediction": predicted_class,
-        "confidence": confidence,
-        "probabilities": dict(results)
+        "confidence": confidence_val,
+        "probabilities": probs_dict
     }
 
 
@@ -178,15 +139,9 @@ def predict_image(image_path, quiet=False):
 # ============================================================
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Nut Surface Defect Classification CLI")
+    parser.add_argument("image_path", type=str, help="Path to input image file")
+    parser.add_argument("--json", action="store_true", help="Output result as JSON for API integration")
 
-    if len(sys.argv) < 2:
-        sys.stderr.write("\nUsage: python predict.py <image_path> [--json]\n")
-        sys.exit(1)
-
-    image_path = sys.argv[1]
-    is_json = "--json" in sys.argv
-
-    res = predict_image(image_path, quiet=is_json)
-
-    if is_json:
-        print(json.dumps(res))
+    args = parser.parse_args()
+    predict_image(args.image_path, json_output=args.json)
