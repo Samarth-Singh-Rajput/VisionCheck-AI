@@ -1,0 +1,6 @@
+@VisionCheckAI.Server_HostAddress = http://localhost:5264
+
+GET {{VisionCheckAI.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
