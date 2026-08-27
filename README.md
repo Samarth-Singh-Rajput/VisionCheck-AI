@@ -176,6 +176,8 @@ These are validation results, not a guarantee of performance on new production i
 ## Development Notes
 
 - Do not commit `.venv`, build output, SQLite databases, uploaded images, datasets, or secrets.
-- The backend must be able to find the `python` executable and `ai_engine/predict.py` when launched.
+- The backend prefers the repository virtual environment at `.venv/bin/python` (or `.venv/Scripts/python.exe` on Windows), then checks `python3` and `python` on PATH.
+- The backend must be able to find `ai_engine/predict.py` and `ai_engine/best_efficientnet_b0.pth` when launched.
+- If model inference is unavailable, the upload endpoint returns an error instead of generating a fallback prediction.
 - Configure the JWT secret through application configuration or environment variables before deployment.
 - Configure CORS with the deployed frontend origin instead of allowing every origin.

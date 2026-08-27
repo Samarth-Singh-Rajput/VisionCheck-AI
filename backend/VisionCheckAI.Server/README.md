@@ -79,7 +79,7 @@ backend/VisionCheckAI.Server/
   - Defines `IInferenceService` and `PyTorchInferenceService`.
   - Spawns a background OS process (`python ai_engine/predict.py <image_path> --json`).
   - Redirects `stdout` and deserializes the JSON response into an `InferenceResult` object containing predicted defect class (`Deformation`, `Fracture`, `Rusting`, `Scratches`, `Excellent`), confidence score, and class probabilities.
-  - Includes robust exception handling and fallback logic if Python or model weights are unavailable.
+  - Returns an inference-unavailable error if Python or the model weights cannot be loaded; it never fabricates a prediction.
 
 #### 5. `Services/AuthService.cs`
 - **Purpose**: Handles security and JWT token generation.

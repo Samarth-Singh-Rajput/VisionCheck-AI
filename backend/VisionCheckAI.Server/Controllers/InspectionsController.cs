@@ -51,8 +51,18 @@ public class InspectionsController : ControllerBase
 
         var relativeUrl = $"/uploads/{fileName}";
 
-        // Run AI Inference
-        var inference = await _inferenceService.RunInferenceAsync(filePath);
+        InferenceResult inference;
+        try
+        {
+            inference = await _inferenceService.RunInferenceAsync(filePath);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = ex.Message
+            });
+        }
 
         var isDefective = !string.Equals(inference.Prediction, "Excellent", StringComparison.OrdinalIgnoreCase);
         var resultText = isDefective ? "Defective" : "Pass";

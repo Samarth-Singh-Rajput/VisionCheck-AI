@@ -34,15 +34,14 @@ public class PyTorchInferenceService : IInferenceService
 
         if (!File.Exists(scriptPath))
         {
-            _logger.LogWarning("predict.py script not found at {Path}. Using fallback inference.", scriptPath);
-            return FallbackInference(imageAbsolutePath);
+            throw new InvalidOperationException($"AI inference script not found at {scriptPath}.");
         }
 
         try
         {
             var startInfo = new ProcessStartInfo
             {
-                FileName = "python",
+                FileName = ResolvePythonExecutable(rootDir),
                 Arguments = $"\"{scriptPath}\" \"{imageAbsolutePath}\" --json",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -65,7 +64,7 @@ public class PyTorchInferenceService : IInferenceService
             if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output))
             {
                 _logger.LogError("Python process failed with code {ExitCode}. Error: {Error}", process.ExitCode, error);
-                return FallbackInference(imageAbsolutePath);
+                throw new InvalidOperationException("The AI inference process failed.");
             }
 
             var result = JsonSerializer.Deserialize<InferenceResult>(output, new JsonSerializerOptions
@@ -73,53 +72,39 @@ public class PyTorchInferenceService : IInferenceService
                 PropertyNameCaseInsensitive = true
             });
 
-            return result ?? FallbackInference(imageAbsolutePath);
+            return result ?? throw new InvalidOperationException("The AI inference process returned an empty result.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to invoke python predict.py process");
-            return FallbackInference(imageAbsolutePath);
+            throw new InvalidOperationException("AI inference is unavailable. Check the Python environment and model files.", ex);
         }
     }
 
-    private static InferenceResult FallbackInference(string imagePath)
+    private static string ResolvePythonExecutable(string rootDir)
     {
-        var filename = Path.GetFileName(imagePath).ToLowerInvariant();
-        string prediction = "Excellent";
-        double confidence = 0.98;
+        var candidates = OperatingSystem.IsWindows()
+            ? new[]
+            {
+                Path.Combine(rootDir, ".venv", "Scripts", "python.exe"),
+                "python"
+            }
+            : new[]
+            {
+                Path.Combine(rootDir, ".venv", "bin", "python"),
+                Path.Combine(rootDir, ".venv", "bin", "python3"),
+                "python3",
+                "python"
+            };
 
-        if (filename.Contains("rust"))
+        foreach (var candidate in candidates)
         {
-            prediction = "Rusting";
-            confidence = 0.96;
-        }
-        else if (filename.Contains("scratch"))
-        {
-            prediction = "Scratches";
-            confidence = 0.94;
-        }
-        else if (filename.Contains("deform"))
-        {
-            prediction = "Deformation";
-            confidence = 0.97;
-        }
-        else if (filename.Contains("fracture"))
-        {
-            prediction = "Fracture";
-            confidence = 0.99;
+            if (!Path.IsPathFullyQualified(candidate) || File.Exists(candidate))
+            {
+                return candidate;
+            }
         }
 
-        var dict = new Dictionary<string, double> { { prediction, confidence } };
-        if (prediction != "Excellent")
-        {
-            dict["Excellent"] = 0.02;
-        }
-
-        return new InferenceResult
-        {
-            Prediction = prediction,
-            Confidence = confidence,
-            Probabilities = dict
-        };
+        throw new InvalidOperationException("No Python executable was found. Create the project virtual environment and install requirements.txt.");
     }
 }
