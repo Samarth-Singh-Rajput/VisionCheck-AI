@@ -25,7 +25,7 @@ ASP.NET Core Web API backend (.NET 9)
         |
         +--> SQLite database and uploaded images
         |
-        +--> Python predict.py --json
+        +--> ai_engine/predict.py --json
                     |
                     +--> EfficientNet-B0 + model weights
 ```
@@ -35,11 +35,12 @@ ASP.NET Core Web API backend (.NET 9)
 ```text
 VisionCheck-AI/
 ├── README.md
+├── ai_engine/
+│   ├── predict.py                    CLI and JSON model inference
+│   ├── test_model.py                 Model smoke test
+│   ├── model_config.json             Labels and preprocessing values
+│   └── best_efficientnet_b0.pt       Trained model weights
 ├── requirements.txt                  Python runtime dependencies
-├── predict.py                        CLI and JSON model inference
-├── test_model.py                     Model smoke test
-├── model_config.json                 Labels and preprocessing values
-├── best_efficientnet_b0.pth          Trained model weights
 ├── test_images/                      Sample inference images
 ├── nutsurface-classifier-training-history.ipynb
 │                                     Training and evaluation notebook
@@ -64,7 +65,7 @@ VisionCheck-AI/
 - Python 3.9 or newer
 - PyTorch, Torchvision, and Pillow
 
-The Python dependencies are listed in [requirements.txt](requirements.txt). The `.pth` model file is committed so a fresh clone has the weights required for inference. Future checkpoints remain ignored by `.gitignore` unless deliberately selected for release.
+The Python dependencies are listed in [requirements.txt](requirements.txt). The `.pt` model file is committed so a fresh clone has the weights required for inference. Future checkpoints remain ignored by `.gitignore` unless deliberately selected for release.
 
 ## Run Locally
 
@@ -82,8 +83,8 @@ python -m pip install -r requirements.txt
 ### 2. Test model inference directly
 
 ```bash
-python predict.py test_images/image.jpg
-python predict.py test_images/image.jpg --json
+python ai_engine/predict.py test_images/image.jpg
+python ai_engine/predict.py test_images/image.jpg --json
 ```
 
 The JSON form is the interface used by the ASP.NET Core inference bridge.
@@ -118,14 +119,6 @@ For local demonstration accounts, use one of these usernames:
 - `supervisor`
 - `operator`
 
-### Optional: Streamlit demo
-
-The standalone Streamlit interface in `app.py` is useful for testing the model without the .NET applications:
-
-```bash
-streamlit run app.py
-```
-
 ## API Endpoints
 
 | Method | Endpoint | Purpose |
@@ -144,9 +137,16 @@ file       image file (.jpg, .jpeg, or .png)
 productId  selected product identifier
 ```
 
-## Model
+## AI Engine
 
-The classifier is a fine-tuned EfficientNet-B0 model using ImageNet normalization. Inference converts images to RGB, resizes them to 256 pixels, center-crops to `224 x 224`, and applies the values stored in `model_config.json`.
+The AI engine is based on the training workflow in `nutsurface-classifier-training-history.ipynb`. It uses a pretrained EfficientNet-B0 model and a two-stage transfer-learning strategy:
+
+1. Stage 1 freezes the feature extractor and trains only the classifier head.
+2. Stage 2 unfreezes the full network and fine-tunes it with a smaller learning rate.
+
+Training uses five ImageFolder classes: `Deformation`, `Excellent`, `Fracture`, `Rusting`, and `Scratches`. The training pipeline applies random resized crops, horizontal and vertical flips, rotation, and color jitter. Validation and production inference convert images to RGB, resize them to 256 pixels, center-crop to `224 x 224`, convert them to tensors, and normalize them with ImageNet mean and standard deviation.
+
+The inference implementation is in `ai_engine/predict.py`. Its `--json` output is the contract used by the ASP.NET Core backend. `ai_engine/model_config.json` stores the class order and preprocessing values, while `ai_engine/best_efficientnet_b0.pt` stores the trained model weights.
 
 The training notebook reports these validation results:
 
@@ -170,6 +170,6 @@ These are validation results, not a guarantee of performance on new production i
 ## Development Notes
 
 - Do not commit `.venv`, build output, SQLite databases, uploaded images, datasets, or secrets.
-- The backend must be able to find the `python` executable and root-level `predict.py` when launched.
+- The backend must be able to find the `python` executable and `ai_engine/predict.py` when launched.
 - Configure the JWT secret through application configuration or environment variables before deployment.
 - Configure CORS with the deployed frontend origin instead of allowing every origin.

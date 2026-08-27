@@ -12,7 +12,7 @@ It acts as the central orchestrator connecting the **Blazor WebAssembly frontend
 - **Database**: SQLite (`visioncheck.db`) managed via Entity Framework Core 9.0.2
 - **Authentication**: JWT Bearer Authentication (`Microsoft.AspNetCore.Authentication.JwtBearer`)
 - **API Documentation**: OpenAPI / Swagger UI (`Swashbuckle.AspNetCore`)
-- **AI Model Bridge**: C# `System.Diagnostics.Process` execution bridge calling Python PyTorch predictor (`predict.py --json`)
+- **AI Model Bridge**: C# `System.Diagnostics.Process` execution bridge calling `ai_engine/predict.py --json`
 
 ---
 
@@ -77,7 +77,7 @@ backend/VisionCheckAI.Server/
 - **Purpose**: Bridges the C# ASP.NET Core application with the PyTorch Python model.
 - **What the code does**:
   - Defines `IInferenceService` and `PyTorchInferenceService`.
-  - Spawns a background OS process (`python predict.py <image_path> --json`).
+  - Spawns a background OS process (`python ai_engine/predict.py <image_path> --json`).
   - Redirects `stdout` and deserializes the JSON response into an `InferenceResult` object containing predicted defect class (`Deformation`, `Fracture`, `Rusting`, `Scratches`, `Excellent`), confidence score, and class probabilities.
   - Includes robust exception handling and fallback logic if Python or model weights are unavailable.
 

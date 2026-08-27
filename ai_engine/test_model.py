@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import torch
 from torchvision import models
 from PIL import Image
@@ -9,8 +10,9 @@ from torchvision import transforms
 # Configuration
 # ==========================================
 
-MODEL_PATH = "best_efficientnet_b0.pth"
-CONFIG_PATH = "model_config.json"
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "best_efficientnet_b0.pt"
+CONFIG_PATH = BASE_DIR / "model_config.json"
 
 
 # ==========================================

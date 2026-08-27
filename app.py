@@ -27,12 +27,8 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).resolve().parent
 
-MODEL_PATH = BASE_DIR / "best_efficientnet_b0.pth"
-if not MODEL_PATH.exists():
-    ALT_MODEL_PATH = BASE_DIR / "best_efficientnet_b0 (1).pth"
-    if ALT_MODEL_PATH.exists():
-        MODEL_PATH = ALT_MODEL_PATH
-CONFIG_PATH = BASE_DIR / "model_config.json"
+MODEL_PATH = BASE_DIR / "ai_engine" / "best_efficientnet_b0.pt"
+CONFIG_PATH = BASE_DIR / "ai_engine" / "model_config.json"
 
 
 # ============================================================

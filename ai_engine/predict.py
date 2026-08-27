@@ -14,11 +14,7 @@ from PIL import Image
 
 BASE_DIR = Path(__file__).resolve().parent
 
-MODEL_PATH = BASE_DIR / "best_efficientnet_b0.pth"
-if not MODEL_PATH.exists():
-    ALT_MODEL_PATH = BASE_DIR / "best_efficientnet_b0 (1).pth"
-    if ALT_MODEL_PATH.exists():
-        MODEL_PATH = ALT_MODEL_PATH
+MODEL_PATH = BASE_DIR / "best_efficientnet_b0.pt"
 
 CONFIG_PATH = BASE_DIR / "model_config.json"
 

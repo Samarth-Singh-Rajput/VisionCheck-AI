@@ -30,7 +30,7 @@ public class PyTorchInferenceService : IInferenceService
     public async Task<InferenceResult> RunInferenceAsync(string imageAbsolutePath)
     {
         var rootDir = Path.GetFullPath(Path.Combine(_env.ContentRootPath, "..", ".."));
-        var scriptPath = Path.Combine(rootDir, "predict.py");
+        var scriptPath = Path.Combine(rootDir, "ai_engine", "predict.py");
 
         if (!File.Exists(scriptPath))
         {

@@ -40,10 +40,10 @@ python -m pip install --upgrade pip
 python -m pip install torch torchvision pillow streamlit pandas matplotlib
 ```
 
-The trained checkpoint and configuration are expected at the project root:
+The trained checkpoint and configuration are stored in `ai_engine/`:
 
-- `best_efficientnet_b0.pth`
-- `model_config.json`
+- `ai_engine/best_efficientnet_b0.pt`
+- `ai_engine/model_config.json`
 
 ## Web App
 
@@ -60,7 +60,7 @@ Open the local URL printed by Streamlit, upload a `.jpg`, `.jpeg`, or `.png` ima
 Run inference for one image:
 
 ```bash
-python predict.py test_images/image.jpg
+python ai_engine/predict.py test_images/image.jpg
 ```
 
 The command prints the selected class, confidence, and probabilities for all classes. Any image path can be supplied in place of the example path.
@@ -101,7 +101,7 @@ Additional sample images are available in `test_images/`, including examples for
 
 ## Image Preprocessing
 
-Input images are converted to RGB, resized to 256 pixels, center-cropped to `224 x 224`, converted to tensors, and normalized using the ImageNet mean and standard deviation. These values are stored in `model_config.json` and are shared by the web app and CLI predictor.
+Input images are converted to RGB, resized to 256 pixels, center-cropped to `224 x 224`, converted to tensors, and normalized using the ImageNet mean and standard deviation. These values are stored in `ai_engine/model_config.json` and are shared by the web app and CLI predictor.
 
 ## Training Notebook
 
@@ -110,11 +110,11 @@ Input images are converted to RGB, resized to 256 pixels, center-cropped to `224
 ## Project Structure
 
 ```text
-app.py                              Streamlit web application
-predict.py                          Command-line inference script
-test_model.py                       Model loading and smoke test
-model_config.json                   Class labels and preprocessing settings
-best_efficientnet_b0.pth           Trained model weights
+app.py                              Optional Streamlit web application
+ai_engine/predict.py                Command-line inference script
+ai_engine/test_model.py             Model loading and smoke test
+ai_engine/model_config.json         Class labels and preprocessing settings
+ai_engine/best_efficientnet_b0.pt   Trained model weights
 test_images/                        Sample input images
 nutsurface-classifier-training-history.ipynb
                                     Training and evaluation notebook
