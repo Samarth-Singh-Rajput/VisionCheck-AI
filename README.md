@@ -37,6 +37,7 @@ VisionCheck-AI/
 ├── README.md
 ├── ai_engine/
 │   ├── predict.py                    CLI and JSON model inference
+│   ├── app.py                        Local AI application entry point
 │   ├── test_model.py                 Model smoke test
 │   ├── model_config.json             Labels and preprocessing values
 │   └── best_efficientnet_b0.pth      Trained model weights
@@ -55,7 +56,12 @@ VisionCheck-AI/
 │   ├── Services/                     Typed API clients and application state
 │   ├── Shared/                       Layouts, charts, and reusable components
 │   └── wwwroot/                      Static assets and API configuration
-└── documentation PDFs                Technical and research references
+├── docs/                             Technical and research documentation
+│   ├── documentation-VisionCheckAI.pdf
+│   ├── high_level_documentation.pdf
+│   ├── low_level_documentation.pdf
+│   └── paper-VisionCheckAI.pdf
+└── NUT_SURFACE_CLASSIFIER_README.md  AI training and inference notes
 ```
 
 ## Requirements
@@ -162,10 +168,10 @@ These are validation results, not a guarantee of performance on new production i
 
 - [Backend README](backend/VisionCheckAI.Server/README.md)
 - [AI and training README](NUT_SURFACE_CLASSIFIER_README.md)
-- `documentation(VisionCheckAI).pdf`
-- `high_level_documentation.pdf`
-- `low_level_documentation.pdf`
-- `paper(VisionCheckAI).pdf`
+- `docs/documentation-VisionCheckAI.pdf`
+- `docs/high_level_documentation.pdf`
+- `docs/low_level_documentation.pdf`
+- `docs/paper-VisionCheckAI.pdf`
 
 ## Development Notes
 

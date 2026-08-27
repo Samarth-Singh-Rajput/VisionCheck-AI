@@ -110,7 +110,7 @@ Input images are converted to RGB, resized to 256 pixels, center-cropped to `224
 ## Project Structure
 
 ```text
-app.py                              Optional Streamlit web application
+ai_engine/app.py                    Optional Streamlit web application
 ai_engine/predict.py                Command-line inference script
 ai_engine/test_model.py             Model loading and smoke test
 ai_engine/model_config.json         Class labels and preprocessing settings
