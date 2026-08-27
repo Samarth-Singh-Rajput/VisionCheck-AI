@@ -42,7 +42,7 @@ python -m pip install torch torchvision pillow streamlit pandas matplotlib
 
 The trained checkpoint and configuration are stored in `ai_engine/`:
 
-- `ai_engine/best_efficientnet_b0.pt`
+- `ai_engine/best_efficientnet_b0.pth`
 - `ai_engine/model_config.json`
 
 ## Web App
@@ -114,7 +114,7 @@ app.py                              Optional Streamlit web application
 ai_engine/predict.py                Command-line inference script
 ai_engine/test_model.py             Model loading and smoke test
 ai_engine/model_config.json         Class labels and preprocessing settings
-ai_engine/best_efficientnet_b0.pt   Trained model weights
+ai_engine/best_efficientnet_b0.pth  Trained model weights
 test_images/                        Sample input images
 nutsurface-classifier-training-history.ipynb
                                     Training and evaluation notebook

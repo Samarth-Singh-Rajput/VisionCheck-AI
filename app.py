@@ -27,7 +27,7 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).resolve().parent
 
-MODEL_PATH = BASE_DIR / "ai_engine" / "best_efficientnet_b0.pt"
+MODEL_PATH = BASE_DIR / "ai_engine" / "best_efficientnet_b0.pth"
 CONFIG_PATH = BASE_DIR / "ai_engine" / "model_config.json"
 
 

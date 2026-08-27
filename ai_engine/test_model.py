@@ -11,7 +11,7 @@ from torchvision import transforms
 # ==========================================
 
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / "best_efficientnet_b0.pt"
+MODEL_PATH = BASE_DIR / "best_efficientnet_b0.pth"
 CONFIG_PATH = BASE_DIR / "model_config.json"
 
 

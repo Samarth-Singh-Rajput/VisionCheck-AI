@@ -39,7 +39,7 @@ VisionCheck-AI/
 │   ├── predict.py                    CLI and JSON model inference
 │   ├── test_model.py                 Model smoke test
 │   ├── model_config.json             Labels and preprocessing values
-│   └── best_efficientnet_b0.pt       Trained model weights
+│   └── best_efficientnet_b0.pth      Trained model weights
 ├── requirements.txt                  Python runtime dependencies
 ├── test_images/                      Sample inference images
 ├── nutsurface-classifier-training-history.ipynb
@@ -65,7 +65,7 @@ VisionCheck-AI/
 - Python 3.9 or newer
 - PyTorch, Torchvision, and Pillow
 
-The Python dependencies are listed in [requirements.txt](requirements.txt). The `.pt` model file is committed so a fresh clone has the weights required for inference. Future checkpoints remain ignored by `.gitignore` unless deliberately selected for release.
+The Python dependencies are listed in [requirements.txt](requirements.txt). The `.pth` model file is committed so a fresh clone has the weights required for inference. Future checkpoints remain ignored by `.gitignore` unless deliberately selected for release.
 
 ## Run Locally
 
@@ -146,7 +146,7 @@ The AI engine is based on the training workflow in `nutsurface-classifier-traini
 
 Training uses five ImageFolder classes: `Deformation`, `Excellent`, `Fracture`, `Rusting`, and `Scratches`. The training pipeline applies random resized crops, horizontal and vertical flips, rotation, and color jitter. Validation and production inference convert images to RGB, resize them to 256 pixels, center-crop to `224 x 224`, convert them to tensors, and normalize them with ImageNet mean and standard deviation.
 
-The inference implementation is in `ai_engine/predict.py`. Its `--json` output is the contract used by the ASP.NET Core backend. `ai_engine/model_config.json` stores the class order and preprocessing values, while `ai_engine/best_efficientnet_b0.pt` stores the trained model weights.
+The inference implementation is in `ai_engine/predict.py`. Its `--json` output is the contract used by the ASP.NET Core backend. `ai_engine/model_config.json` stores the class order and preprocessing values, while `ai_engine/best_efficientnet_b0.pth` stores the trained model weights.
 
 The training notebook reports these validation results:
 
