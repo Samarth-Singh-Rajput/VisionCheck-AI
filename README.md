@@ -1,124 +1,175 @@
-# VisionCheck-AI — Automated Industrial Surface Defect Detection System
+# VisionCheck-AI
 
-**VisionCheck-AI** is an end-to-end, machine vision-based quality control and automated surface defect detection platform designed for modern manufacturing pipelines. 
+VisionCheck-AI is a full-stack quality-control application for classifying visible nut-surface conditions. It combines a Blazor WebAssembly dashboard, an ASP.NET Core REST API, SQLite persistence, and a PyTorch EfficientNet-B0 classifier.
 
-By combining a high-accuracy **PyTorch EfficientNet-B0** deep learning classification model with an **ASP.NET Core 8 Web API** and an interactive **Blazor WebAssembly** web application, VisionCheck-AI eliminates manual inspection bottleneck, reduces human error, and provides real-time quality analytics for factory conveyor systems.
+## What It Does
 
----
+An operator uploads an image of a nut through the web application. The backend stores the image, invokes the Python inference script, saves the inspection result, and returns the prediction and confidence to the dashboard. Supervisors can review or override results, while the dashboard exposes inspection history and quality metrics.
 
-## Key Features
+The model predicts five classes:
 
-- **Automated AI Surface Inspection**: Fine-grained classification of industrial parts into 5 surface condition categories:
-  - `Deformation` (Defective)
-  - `Excellent` (Non-Defective / Pass)
-  - `Fracture` (Defective)
-  - `Rusting` (Defective)
-  - `Scratches` (Defective)
-- **High Accuracy Model**: EfficientNet-B0 model trained with a 2-stage transfer learning pipeline, achieving **98.41% validation accuracy** and **0.9798 macro F1-score**.
-- **Human-in-the-Loop Review System**: Supervisors and Administrators can inspect AI predictions, confirm results, or apply manual overrides when edge cases occur.
-- **Real-Time Analytics Dashboard**: Live metrics monitoring total inspections, pass/defect rates, category breakdowns, severity distributions, and 7-day trend analysis.
-- **Historical Audit Log**: Filterable inspection search engine with date range, category, severity, and product SKU filters.
-- **Role-Based Access Control (RBAC)**: Role gating for Inspectors, Supervisors, and Administrators powered by JWT Bearer Authentication.
+- `Deformation`
+- `Excellent`
+- `Fracture`
+- `Rusting`
+- `Scratches`
 
----
+## Architecture
 
-## System Architecture
-
-```
-                                 +-------------------------------------+
-                                 |  Blazor WebAssembly Frontend (.NET) |
-                                 |  (frontend/VisionCheckAI.Client)    |
-                                 +------------------+------------------+
-                                                    |
-                                                    | REST APIs (JSON / JWT)
-                                                    v
-                                 +-------------------------------------+
-                                 |  ASP.NET Core 8 Web API Backend     |
-                                 |  (backend/VisionCheckAI.Server)     |
-                                 +---------+-----------------+---------+
-                                           |                 |
-                         SQLite DB (EF Core)                 | Process Invocation
-                                           v                 v
-                                 +------------------+  +---------------+
-                                 |  visioncheck.db  |  |  predict.py   |
-                                 +------------------+  |  (PyTorch ML) |
-                                                       +---------------+
+```text
+Blazor WebAssembly frontend (.NET 8)
+        |
+        | REST / JSON / JWT
+        v
+ASP.NET Core Web API backend (.NET 9)
+        |
+        +--> SQLite database and uploaded images
+        |
+        +--> Python predict.py --json
+                    |
+                    +--> EfficientNet-B0 + model weights
 ```
 
----
-
-## Repository Structure
+## Repository Layout
 
 ```text
 VisionCheck-AI/
-├── README.md                            Main project documentation
-├── paper(VisionCheckAI).pdf             Research paper detailing EfficientNet-B0 architecture & benchmarks
-├── model_config.json                    Model configuration (mean, std, input size, class labels)
-├── best_efficientnet_b0.pth             Trained EfficientNet-B0 PyTorch model weights (optional local artifact)
-├── predict.py                           Python CLI & JSON inference script
-├── test_model.py                        PyTorch model loading smoke test
-├── test_images/                         Sample test images (deformation, fracture, rust, scratches, excellent)
-│
-├── backend/
-│   └── VisionCheckAI.Server/            ASP.NET Core 8 Web API backend project
-│       ├── Controllers/                 REST API endpoints (Auth, Products, Inspections, Dashboard)
-│       ├── Data/                        EF Core DbContext and SQLite Database Entities
-│       ├── Models/                      DTOs matching REST API contracts
-│       ├── Services/                    PyTorch Inference Service & JWT Authentication Service
-│       ├── Program.cs                   Application startup & middleware pipeline
-│       └── README.md                    Detailed backend documentation & code walkthrough
-│
-└── frontend/
-    └── VisionCheckAI.Client/            Blazor WebAssembly (.NET 8) frontend project
-        ├── Pages/                       UI Views (Login, Dashboard, Inspection Upload, History)
-        ├── Services/                    Typed HTTP Client services & state management
-        ├── Shared/                      Reusable components & SVG chart engines
-        └── wwwroot/                     CSS tokens, static assets, and appsettings configuration
+├── README.md
+├── requirements.txt                  Python runtime dependencies
+├── predict.py                        CLI and JSON model inference
+├── test_model.py                     Model smoke test
+├── model_config.json                 Labels and preprocessing values
+├── best_efficientnet_b0.pth          Trained model weights
+├── test_images/                      Sample inference images
+├── nutsurface-classifier-training-history.ipynb
+│                                     Training and evaluation notebook
+├── backend/VisionCheckAI.Server/
+│   ├── Controllers/                  REST API endpoints
+│   ├── Data/                         EF Core entities and database context
+│   ├── Models/                       API DTOs
+│   ├── Services/                     Authentication and AI bridge services
+│   └── README.md                     Backend walkthrough
+├── frontend/VisionCheckAI.Client/
+│   ├── Pages/                        Login, dashboard, upload, and history
+│   ├── Services/                     Typed API clients and application state
+│   ├── Shared/                       Layouts, charts, and reusable components
+│   └── wwwroot/                      Static assets and API configuration
+└── documentation PDFs                Technical and research references
 ```
 
----
+## Requirements
 
-## Quick Start Guide
+- .NET 9 SDK for the backend
+- .NET 8 SDK for the Blazor frontend
+- Python 3.9 or newer
+- PyTorch, Torchvision, and Pillow
 
-### Prerequisites
-- [.NET 8 SDK or .NET 9 SDK](https://dotnet.microsoft.com/download)
-- [Python 3.9+](https://www.python.org/downloads/) with `torch`, `torchvision`, `pillow` installed.
+The Python dependencies are listed in [requirements.txt](requirements.txt). The `.pth` model file is committed so a fresh clone has the weights required for inference. Future checkpoints remain ignored by `.gitignore` unless deliberately selected for release.
 
-### 1. Running the Backend API
-Navigate to the backend directory and launch the ASP.NET Core server:
+## Run Locally
+
+### 1. Install Python dependencies
+
+From the repository root:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+### 2. Test model inference directly
+
+```bash
+python predict.py test_images/image.jpg
+python predict.py test_images/image.jpg --json
+```
+
+The JSON form is the interface used by the ASP.NET Core inference bridge.
+
+### 3. Start the backend
+
+In a terminal where the Python environment is available:
+
 ```bash
 cd backend/VisionCheckAI.Server
-dotnet run
+dotnet run --launch-profile http
 ```
-The server will start on **`http://localhost:7080`**.
-> Interactive Swagger API Documentation will be available at **`http://localhost:7080/swagger`**.
 
-### 2. Running the Blazor Frontend Web App
-In a separate terminal, launch the Blazor WebAssembly client:
+The API runs at `http://localhost:7080`. Swagger is available at `http://localhost:7080/swagger`.
+
+The backend creates `visioncheck.db` and the upload directory automatically. These generated files are ignored by Git.
+
+### 4. Start the frontend
+
+In a second terminal:
+
 ```bash
 cd frontend/VisionCheckAI.Client
 dotnet run
 ```
-Open your web browser and navigate to **`http://localhost:5285`** (or `https://localhost:7285`).
 
-### 3. Signing In & Uploading Test Images
-- **Login Credentials**: Enter any password. Use username `admin` (Administrator), `supervisor` (Supervisor), or `operator` (Inspector).
-- **Upload Inspection**: Go to **New Inspection**, select a product SKU, and upload any image from `test_images/` to execute real-time PyTorch inference!
+Open the URL printed by the .NET tooling. The default frontend configuration points to `http://localhost:7080/` and uses the real API.
 
----
+For local demonstration accounts, use one of these usernames:
 
-## Model Benchmark Summary
+- `admin`
+- `supervisor`
+- `operator`
 
-| Metric | Benchmark Score |
+### Optional: Streamlit demo
+
+The standalone Streamlit interface in `app.py` is useful for testing the model without the .NET applications:
+
+```bash
+streamlit run app.py
+```
+
+## API Endpoints
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/auth/login` | Authenticate and issue a JWT |
+| `GET` | `/api/products` | List inspectable products |
+| `POST` | `/api/inspections/upload` | Upload an image and run inference |
+| `POST` | `/api/inspections/{id}/review` | Confirm or override a result |
+| `GET` | `/api/inspections` | Search inspection history |
+| `GET` | `/api/dashboard/summary` | Return dashboard metrics |
+
+The upload request uses `multipart/form-data` with these fields:
+
+```text
+file       image file (.jpg, .jpeg, or .png)
+productId  selected product identifier
+```
+
+## Model
+
+The classifier is a fine-tuned EfficientNet-B0 model using ImageNet normalization. Inference converts images to RGB, resizes them to 256 pixels, center-crops to `224 x 224`, and applies the values stored in `model_config.json`.
+
+The training notebook reports these validation results:
+
+| Metric | Score |
 | --- | ---: |
-| Overall Validation Accuracy | **98.41%** |
-| Weighted Precision | **98.53%** |
-| Weighted Recall | **98.41%** |
-| Weighted F1-Score | **98.43%** |
-| Macro F1-Score | **0.9798** |
+| Accuracy | 98.41% |
+| Weighted F1 | 98.43% |
+| Macro F1 | 97.98% |
 
----
+These are validation results, not a guarantee of performance on new production images. Confidence should be reviewed alongside image quality and human inspection.
 
-## License
+## Documentation
 
-Developed as part of an advanced machine vision & industrial quality assurance initiative.
+- [Backend README](backend/VisionCheckAI.Server/README.md)
+- [AI and training README](NUT_SURFACE_CLASSIFIER_README.md)
+- `documentation(VisionCheckAI).pdf`
+- `high_level_documentation.pdf`
+- `low_level_documentation.pdf`
+- `paper(VisionCheckAI).pdf`
+
+## Development Notes
+
+- Do not commit `.venv`, build output, SQLite databases, uploaded images, datasets, or secrets.
+- The backend must be able to find the `python` executable and root-level `predict.py` when launched.
+- Configure the JWT secret through application configuration or environment variables before deployment.
+- Configure CORS with the deployed frontend origin instead of allowing every origin.
