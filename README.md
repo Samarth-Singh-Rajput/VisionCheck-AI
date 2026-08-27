@@ -117,7 +117,7 @@ cd frontend/VisionCheckAI.Client
 dotnet run
 ```
 
-Open the URL printed by the .NET tooling. The default frontend configuration points to `http://localhost:7080/` and uses the real API.
+Open `http://localhost:5285`. The development frontend uses HTTP to match the backend at `http://localhost:7080/`, so uploaded images served from the backend are not blocked by browser mixed-content rules.
 
 For local demonstration accounts, use one of these usernames:
 
